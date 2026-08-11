@@ -12,7 +12,7 @@ import { useCases } from '@/content/use-cases';
 import { breadcrumbSchema, jsonLdScript, pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Use Cases — Overthinking, Anxiety, Habits, Exam Stress',
+  title: 'Use Cases — Overthinking, Anxiety, Habits',
   description:
     'Start from the thing you are actually dealing with: the 1am loop, constant ' +
     'worry, a habit that never sticks, nobody to talk to, exam pressure, or a ' +

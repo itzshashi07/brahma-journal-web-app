@@ -18,8 +18,17 @@ import { useCases } from '@/content/use-cases';
 import { faqSchema, jsonLdScript, pageMetadata } from '@/lib/seo';
 import { site } from '@/lib/site';
 
+/**
+ * The brand is deliberately absent from this title.
+ *
+ * The root layout appends it — the template is `%s · InnenFlow` — so including
+ * it here produced "InnenFlow — Private Journal… · InnenFlow" in the tab and in
+ * every search result. A doubled brand is not just untidy: a title truncates
+ * from the right at roughly 60 characters, so the repetition was pushing the
+ * words somebody actually searched for out of the visible part.
+ */
 export const metadata: Metadata = pageMetadata({
-  title: `${site.name} — Private Journal, Meditation & Anonymous Support`,
+  title: 'Private Journal, Meditation & Anonymous Support',
   description:
     'Write a journal nobody can read, sit for five minutes, and say the thing ' +
     'you cannot say anywhere else — anonymously. Free on Android and in your ' +

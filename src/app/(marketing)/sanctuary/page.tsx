@@ -24,7 +24,7 @@ import { breadcrumbSchema, jsonLdScript, pageMetadata } from '@/lib/seo';
 export const revalidate = 3600;
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Sanctuary — Articles on Calm, Habits, Sleep and Getting Through',
+  title: 'Sanctuary — Articles on Calm, Habits and Sleep',
   description:
     'Plain-language writing on anxiety, overthinking, habits, sleep and ' +
     'self-worth — by people who have been in it. Free to read, in English and ' +

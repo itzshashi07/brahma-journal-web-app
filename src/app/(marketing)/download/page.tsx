@@ -18,7 +18,7 @@ import {
 import { site } from '@/lib/site';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Download InnenFlow — Free on Android, or Use It in Your Browser',
+  title: 'Download — Free on Android or in Your Browser',
   description:
     'Install InnenFlow free from Google Play, or just sign in and use the full ' +
     'app in your browser on the same account. iOS is coming.',

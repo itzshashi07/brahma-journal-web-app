@@ -11,7 +11,7 @@ import { breadcrumbSchema, jsonLdScript, pageMetadata } from '@/lib/seo';
 import { site } from '@/lib/site';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'About InnenFlow — Why This App Exists',
+  title: 'About — Why This App Exists',
   description:
     'InnenFlow is built by one person in India who needed it. Free, no ads, no ' +
     'data sold, and privacy enforced in the architecture rather than promised ' +

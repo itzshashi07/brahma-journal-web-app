@@ -12,7 +12,7 @@ import { features } from '@/content/features';
 import { breadcrumbSchema, jsonLdScript, pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Features — Journal, Meditation, Anonymous Board & More',
+  title: 'Features — Journal, Meditation & Anonymous Board',
   description:
     'Everything InnenFlow does: a private journal with mood tracking, guided ' +
     'meditation, your own affirmations, an anonymous support board, counselling, ' +

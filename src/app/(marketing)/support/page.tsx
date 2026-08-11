@@ -17,7 +17,7 @@ import {
 import { site } from '@/lib/site';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Support — Get Help, Report Content, Delete Your Account',
+  title: 'Support — Get Help or Delete Your Account',
   description:
     'How to reach a person, report something on the anonymous board, recover ' +
     'your account, or delete everything. Answers to the questions people ' +

@@ -22,3 +22,9 @@ next-env.d.ts
 
 # macOS finder junk
 .DS_Store
+
+# Written and re-added by `next dev` on every run. Ignored rather than
+# committed: it is a local tool artefact that would otherwise show up as an
+# uncommitted change in every working tree.
+AGENTS.md
+CLAUDE.md
