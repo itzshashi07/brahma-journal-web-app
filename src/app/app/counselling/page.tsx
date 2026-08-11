@@ -11,6 +11,7 @@ import {
   timeAgo,
   useApi,
 } from '@/components/app/ui';
+import { COUNSELLING, upiIntent } from '@/content/counselling';
 import { api, type Paged } from '@/lib/api';
 
 /**
@@ -178,6 +179,166 @@ export default function CounsellingPage() {
   );
 }
 
+/**
+ * Pay, then say what you paid.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * The step the web did not have
+ *
+ * A session opens in `awaiting_payment`, and the only way out of it is
+ * `POST /sessions/:id/payment`. The app has had this screen from the
+ * beginning; the website had none, so a member could book a session on the web
+ * and then sit in a chat that would never open, with nothing on screen
+ * explaining what was missing. It was not that the payment was skipped — it was
+ * that there was no way to make it.
+ *
+ * Verification is by hand, deliberately: a person reads a bank statement. That
+ * is slower than a payment gateway and it is what keeps the fee at ₹299 without
+ * a gateway's cut, and it is why the transaction reference is asked for rather
+ * than inferred.
+ */
+function PaymentStep({
+  sessionId,
+  amount,
+  onPaid,
+}: {
+  sessionId: string;
+  amount: number;
+  onPaid: () => Promise<void>;
+}) {
+  const [mode, setMode] = useState(PAYMENT_MODES[0]);
+  const [reference, setReference] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function submit() {
+    const ref = reference.trim();
+    if (!ref) {
+      setError('The transaction reference is what we match against the bank.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/api/counselling/sessions/${sessionId}/payment`, {
+        paymentMode: mode,
+        transactionId: ref,
+      });
+      await onPaid();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send that.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="glass mb-4 overflow-hidden">
+      <div className="border-b border-hairline px-5 py-4">
+        <p className="text-[14px] font-semibold text-ink-primary">
+          Step 1 — pay ₹{amount}
+        </p>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-ink-secondary">
+          A {COUNSELLING.sessionMinutes}-minute session, by chat or video. Pay
+          to the UPI id below from any app.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <code className="rounded-md border border-hairline bg-bg-dark/60 px-3 py-2 text-[13px] text-ink-primary">
+            {COUNSELLING.upiId}
+          </code>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(COUNSELLING.upiId);
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 2000);
+              } catch {
+                // Clipboard is blocked in some browsers without a gesture
+                // policy. The id is on screen and selectable either way.
+              }
+            }}
+            className="btn-ghost !px-4 !py-2 text-[12.5px]"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+
+          {/* Only useful where something can handle `upi://` — a phone. On a
+              desktop it would open nothing, so it says so rather than
+              pretending. */}
+          <a href={upiIntent(amount)} className="btn-primary !px-4 !py-2 text-[12.5px]">
+            Open a UPI app
+          </a>
+        </div>
+      </div>
+
+      <div className="px-5 py-4">
+        <p className="text-[14px] font-semibold text-ink-primary">
+          Step 2 — tell us what you paid
+        </p>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-ink-secondary">
+          We match this against the bank by hand, which is why it is asked for.
+        </p>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
+              Payment mode
+            </label>
+            <select
+              className="field"
+              value={mode}
+              onChange={(event) => setMode(event.target.value)}
+            >
+              {PAYMENT_MODES.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="counselling-ref"
+              className="mb-1.5 block text-[12px] font-medium text-ink-secondary"
+            >
+              Transaction ID / UTR<span className="ml-0.5 text-danger">*</span>
+            </label>
+            <input
+              id="counselling-ref"
+              className={`field ${error ? '!border-danger' : ''}`}
+              value={reference}
+              onChange={(event) => {
+                setReference(event.target.value);
+                setError(null);
+              }}
+              placeholder="e.g. 431298765432"
+            />
+          </div>
+        </div>
+
+        {error && (
+          <p role="alert" className="mt-2 text-[12px] text-danger">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy}
+          className="btn-primary mt-4 w-full"
+        >
+          {busy ? 'Sending…' : 'I have paid'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function purgeCountdown(purgeAfter: string): string {
   const left = new Date(purgeAfter).getTime() - Date.now();
   if (left <= 0) return 'deleting now';
@@ -288,6 +449,46 @@ function Chat({
         <div className="mb-4 rounded-md border border-accent/30 bg-accent/10 px-4 py-2.5 text-center">
           <p className="text-[12px] text-accent">
             This conversation is {purgeCountdown(session.data.session.purgeAfter)}.
+          </p>
+        </div>
+      )}
+
+      {status === 'awaiting_payment' && (
+        <PaymentStep
+          sessionId={sessionId}
+          amount={session.data?.session.amount || COUNSELLING.fee}
+          onPaid={async () => {
+            await Promise.all([session.reload(), messages.reload()]);
+          }}
+        />
+      )}
+
+      {/* Paid, and now waiting on a person.
+          The app shows this state; the web showed nothing at all, so a member
+          who had just sent money had no indication that anything was
+          happening — which is the worst possible moment for silence. */}
+      {status === 'payment_submitted' && (
+        <div className="glass mb-4 flex items-start gap-3 border-accent/30 p-4">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+          <p className="text-[13px] leading-relaxed text-ink-secondary">
+            <span className="font-semibold text-ink-primary">
+              Your payment details are with us.
+            </span>{' '}
+            We check them by hand — usually within a few minutes during working
+            hours. This chat opens the moment it is confirmed, and you can close
+            the tab; nothing is lost.
+          </p>
+        </div>
+      )}
+
+      {status === 'rejected' && (
+        <div className="glass mb-4 flex items-start gap-3 border-danger/30 p-4">
+          <p className="text-[13px] leading-relaxed text-ink-secondary">
+            <span className="font-semibold text-ink-primary">
+              This request was not approved.
+            </span>{' '}
+            If you believe the payment went through, reply below with the
+            transaction reference and somebody will look again.
           </p>
         </div>
       )}
@@ -473,6 +674,22 @@ function Chat({
   );
 }
 
+/**
+ * How the money arrived, in the member's words.
+ *
+ * A free-text box here would produce "gpay", "G Pay", "google pay" and "paid"
+ * across four sessions, and the operator matching a bank statement is reading
+ * these one at a time. Mirrors the list in the app.
+ */
+const PAYMENT_MODES = [
+  'UPI — Google Pay',
+  'UPI — PhonePe',
+  'UPI — Paytm',
+  'UPI — other',
+  'Bank transfer',
+  'Other',
+];
+
 const CONCERNS = [
   'Anxiety or constant worry',
   'Sadness or low mood',
@@ -498,11 +715,61 @@ function Intake({ onDone }: { onDone: () => void }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
 
-  const set = (key: keyof typeof form) => (value: string) =>
+  const set = (key: keyof typeof form) => (value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
+    // The message goes the moment they start fixing it, rather than surviving
+    // until the next submit and reading as though the correction did not count.
+    setInvalid((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
+  /**
+   * What has to be filled in, and why each one.
+   *
+   * The API accepts every field as optional and defaults it to an empty string,
+   * which is right for an API — a half-filled session is better than a lost
+   * one. It was wrong for this form, which submitted a blank intake happily: a
+   * counsellor then opened a request with no name, no age and no phone number
+   * and had nothing to work with, and no way to reach somebody whose
+   * connection dropped mid-session.
+   *
+   * The app validates these. This did not, which is the whole of the
+   * difference.
+   */
+  function problems(): Record<string, string> {
+    const found: Record<string, string> = {};
+    if (!form.name.trim()) found.name = 'A first name is enough.';
+
+    const age = Number(form.age);
+    if (!form.age.trim()) found.age = 'Needed — some things are age-specific.';
+    else if (!Number.isFinite(age) || age < 13 || age > 120)
+      found.age = 'That does not look right.';
+
+    if (!form.gender.trim()) found.gender = 'Pick one.';
+
+    // Ten digits, however they are typed. This is how a counsellor reaches
+    // somebody whose call drops — the one field that has to be usable.
+    const digits = form.phone.replace(/\D/g, '');
+    if (!form.phone.trim()) found.phone = 'So we can reach you if the call drops.';
+    else if (digits.length < 10) found.phone = 'That is not a full number.';
+
+    return found;
+  }
 
   async function submit() {
+    const found = problems();
+    setInvalid(found);
+    if (Object.keys(found).length) {
+      setError('Please complete the highlighted fields.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -521,10 +788,10 @@ function Intake({ onDone }: { onDone: () => void }) {
           a long form, and none of the fields past these change what the
           counsellor does first. */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Your name" value={form.name} onChange={set('name')} />
-        <Field label="Age" value={form.age} onChange={set('age')} />
-        <Field label="Gender" value={form.gender} onChange={set('gender')} />
-        <Field label="Phone" value={form.phone} onChange={set('phone')} />
+        <Field label="Your name" value={form.name} onChange={set('name')} required error={invalid.name} />
+        <Field label="Age" value={form.age} onChange={set('age')} required error={invalid.age} inputMode="numeric" />
+        <Field label="Gender" value={form.gender} onChange={set('gender')} required error={invalid.gender} />
+        <Field label="Phone" value={form.phone} onChange={set('phone')} required error={invalid.phone} inputMode="tel" />
 
         <div>
           <label className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
@@ -596,23 +863,38 @@ function Field({
   label,
   value,
   onChange,
+  required = false,
+  error,
+  inputMode,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  required?: boolean;
+  error?: string;
+  inputMode?: 'numeric' | 'tel';
 }) {
   const id = `intake-${label.replace(/\W+/g, '-').toLowerCase()}`;
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
         {label}
+        {required && <span className="ml-0.5 text-danger">*</span>}
       </label>
       <input
         id={id}
-        className="field"
+        className={`field ${error ? '!border-danger' : ''}`}
         value={value}
+        inputMode={inputMode}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         onChange={(event) => onChange(event.target.value)}
       />
+      {error && (
+        <p id={`${id}-error`} className="mt-1 text-[11.5px] text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
