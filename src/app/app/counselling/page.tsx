@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, Send, Trash2 } from 'lucide-react';
+import { Clock, MessageSquare, Send, Trash2, Video } from 'lucide-react';
 
 import {
   AsyncSection,
@@ -195,6 +195,7 @@ function Chat({
 }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [choosing, setChoosing] = useState<'chat' | 'meet' | null>(null);
 
   const session = useApi(
     () => api.get<{ session: Session }>(`/api/counselling/sessions/${sessionId}`),
@@ -222,6 +223,30 @@ function Chat({
       await messages.reload();
     } finally {
       setSending(false);
+    }
+  }
+
+  /**
+   * Chat, or a video call.
+   *
+   * This screen said "Approved — choose a format" and then offered no way to
+   * choose one, so a member whose payment had cleared on the web could go no
+   * further: the chat is not open until a format is picked, and picking it was
+   * only possible on Android.
+   *
+   * Choosing chat opens the room immediately. Choosing a call cannot, because a
+   * call needs somebody on the other side of it — it asks, and the counsellor
+   * answers with a room.
+   */
+  async function chooseMode(mode: 'chat' | 'meet') {
+    setChoosing(mode);
+    try {
+      await api.post(`/api/counselling/sessions/${sessionId}/mode`, { mode });
+      await Promise.all([session.reload(), messages.reload()]);
+    } catch {
+      alert('Could not do that just now. Try again in a moment.');
+    } finally {
+      setChoosing(null);
     }
   }
 
@@ -267,15 +292,110 @@ function Chat({
         </div>
       )}
 
+      {status === 'approved' && (
+        <div className="glass mb-4 p-5">
+          <p className="text-[14px] font-semibold text-ink-primary">
+            Your payment is verified. How would you like to talk?
+          </p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-secondary">
+            Both are thirty minutes with the same counsellor. Chat starts the
+            moment you pick it; a call has to be arranged, so you will be sent a
+            room.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => chooseMode('chat')}
+              disabled={choosing !== null}
+              className="glass glass-hover flex items-start gap-3 p-4 text-left disabled:opacity-50"
+            >
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary-light" />
+              <span>
+                <span className="block text-[13.5px] font-semibold text-ink-primary">
+                  {choosing === 'chat' ? 'Opening…' : 'Chat'}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-relaxed text-ink-muted">
+                  Type instead of speaking. Starts now, and nobody hears you.
+                </span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => chooseMode('meet')}
+              disabled={choosing !== null}
+              className="glass glass-hover flex items-start gap-3 p-4 text-left disabled:opacity-50"
+            >
+              <Video className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+              <span>
+                <span className="block text-[13.5px] font-semibold text-ink-primary">
+                  {choosing === 'meet' ? 'Requesting…' : 'Video call'}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-relaxed text-ink-muted">
+                  Thirty minutes on Google Meet. You will get the link here.
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Asked for, not yet arranged. Saying so is the difference between
+          waiting and wondering whether the request went anywhere. */}
+      {status === 'meet_requested' && !session.data?.session.meetLink && (
+        <div className="glass mb-4 flex items-start gap-3 border-accent/30 p-4">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+          <p className="text-[13px] leading-relaxed text-ink-secondary">
+            <span className="font-semibold text-ink-primary">
+              Your call has been requested.
+            </span>{' '}
+            The counsellor will send a Google Meet link here, usually within a
+            few hours. You can keep writing below in the meantime — they will
+            read it before you speak.
+          </p>
+        </div>
+      )}
+
       {session.data?.session.meetLink && (
-        <a
-          href={session.data.session.meetLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary mb-4 w-full"
-        >
-          Join the video call
-        </a>
+        <div className="glass mb-4 overflow-hidden">
+          <div className="border-b border-hairline bg-gradient-primary/10 px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary/20 text-primary-light">
+                <Video className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[14px] font-semibold text-ink-primary">
+                  Your video call is ready
+                </p>
+                <p className="text-[11.5px] text-ink-muted">
+                  Google Meet · 30 minutes
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-5 py-4">
+            <ul className="space-y-1.5 text-[12.5px] leading-relaxed text-ink-secondary">
+              <li>• Somewhere you will not be overheard, if you can manage it.</li>
+              <li>• Headphones make a difference, both ways.</li>
+              <li>• It opens in Google Meet — no account or install needed.</li>
+            </ul>
+
+            <a
+              href={session.data.session.meetLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary mt-4 w-full"
+            >
+              Join the call
+            </a>
+
+            <p className="mt-2.5 text-center text-[11px] text-ink-muted">
+              The link stays here for the whole session.
+            </p>
+          </div>
+        </div>
       )}
 
       <AsyncSection state={messages}>

@@ -25,7 +25,7 @@ export const site = {
    * ─────────────────────────────────────────────────────────────────────────
    * Why the last resort is not a hard-coded domain any more
    *
-   * It was `https://innenflow.app`, and that domain does not resolve yet. The
+   * It was a hard-coded domain that did not resolve at the time. The
    * site went live on Vercel with every canonical announcing that the real
    * version of each page lived at a hostname with no DNS behind it — which is
    * not a cosmetic problem: a canonical is an instruction, and pointing it at a
@@ -70,7 +70,7 @@ export const site = {
 
     if (explicit && !(isLocal.test(explicit) && deployed)) return explicit;
 
-    return hosted ?? 'https://innenflow.app';
+    return hosted ?? 'https://innenflow.com';
   })(),
 
   description:
