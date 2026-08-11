@@ -6,6 +6,7 @@ import { Bell, X } from 'lucide-react';
 
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { onNotificationsChanged } from '@/lib/notify-bus';
 
 type UnreadCounts = {
   broadcast: number;
@@ -114,11 +115,20 @@ export function NotificationBell() {
     };
     document.addEventListener('visibilitychange', onVisible);
 
+    /**
+     * Re-read the moment a feed is cleared or read, rather than at the next
+     * poll. Somebody who clears their notifications and watches the badge sit
+     * there for another forty seconds concludes the clear did not work — which
+     * is the exact complaint this whole change is about.
+     */
+    const unsubscribe = onNotificationsChanged(() => void refresh());
+
     return () => {
       cancelled = true;
       stop();
       if (toastTimer.current) window.clearTimeout(toastTimer.current);
       document.removeEventListener('visibilitychange', onVisible);
+      unsubscribe();
     };
   }, [user]);
 

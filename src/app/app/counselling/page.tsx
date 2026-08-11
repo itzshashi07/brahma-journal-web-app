@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Clock, MessageSquare, Send, Trash2, Video } from 'lucide-react';
 
 import {
@@ -13,6 +13,8 @@ import {
 } from '@/components/app/ui';
 import { COUNSELLING, upiIntent } from '@/content/counselling';
 import { api, type Paged } from '@/lib/api';
+import { notificationsChanged } from '@/lib/notify-bus';
+import { GENDERS, ageProblem, phoneProblem } from '@/lib/validate';
 
 /**
  * Counselling.
@@ -370,6 +372,23 @@ function Chat({
       ),
     [sessionId]
   );
+
+  /**
+   * Opening the chat is reading the reply.
+   *
+   * The `replies` feed is one of the four the header badge counts — a session
+   * whose last message came from the counsellor, after the member last looked.
+   * Nothing on the website marked it seen, so a member read their counsellor's
+   * message and still carried the badge for it, indefinitely, with no way to
+   * clear it: the notifications screen does not list counselling replies,
+   * because they live in the transcript rather than in a feed.
+   */
+  useEffect(() => {
+    api
+      .post('/api/notifications/seen/replies')
+      .then(notificationsChanged)
+      .catch(() => {});
+  }, [sessionId]);
 
   async function send() {
     const text = draft.trim();
@@ -746,18 +765,17 @@ function Intake({ onDone }: { onDone: () => void }) {
     const found: Record<string, string> = {};
     if (!form.name.trim()) found.name = 'A first name is enough.';
 
-    const age = Number(form.age);
-    if (!form.age.trim()) found.age = 'Needed — some things are age-specific.';
-    else if (!Number.isFinite(age) || age < 13 || age > 120)
-      found.age = 'That does not look right.';
+    const age = ageProblem(form.age);
+    if (age) found.age = age;
 
     if (!form.gender.trim()) found.gender = 'Pick one.';
 
-    // Ten digits, however they are typed. This is how a counsellor reaches
-    // somebody whose call drops — the one field that has to be usable.
-    const digits = form.phone.replace(/\D/g, '');
-    if (!form.phone.trim()) found.phone = 'So we can reach you if the call drops.';
-    else if (digits.length < 10) found.phone = 'That is not a full number.';
+    // The one field that has to be usable: it is how a counsellor reaches
+    // somebody whose call drops. Checked against the mobile numbering plan
+    // rather than by counting characters — `1234567890` is ten digits and is
+    // not a number anybody can be called on. See lib/validate.ts.
+    const phone = phoneProblem(form.phone);
+    if (phone) found.phone = phone;
 
     return found;
   }
@@ -790,8 +808,23 @@ function Intake({ onDone }: { onDone: () => void }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Your name" value={form.name} onChange={set('name')} required error={invalid.name} />
         <Field label="Age" value={form.age} onChange={set('age')} required error={invalid.age} inputMode="numeric" />
-        <Field label="Gender" value={form.gender} onChange={set('gender')} required error={invalid.gender} />
-        <Field label="Phone" value={form.phone} onChange={set('phone')} required error={invalid.phone} inputMode="tel" />
+
+        {/* A list, not a text box. A counsellor needs to know how to address
+            somebody, and free text produced "M", "male", "Male ", "m" and one
+            person's entire sentence about why the question is beside the
+            point — which was fair, and is why declining is one of the three
+            answers rather than a blank field. */}
+        <SelectField
+          label="Gender"
+          value={form.gender}
+          onChange={set('gender')}
+          required
+          error={invalid.gender}
+          placeholder="Choose one"
+          options={GENDERS.map((g) => ({ value: g.value, label: g.label }))}
+        />
+
+        <Field label="Phone" value={form.phone} onChange={set('phone')} required error={invalid.phone} inputMode="tel" placeholder="98765 43210" />
 
         <div>
           <label className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
@@ -866,6 +899,7 @@ function Field({
   required = false,
   error,
   inputMode,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -873,6 +907,7 @@ function Field({
   required?: boolean;
   error?: string;
   inputMode?: 'numeric' | 'tel';
+  placeholder?: string;
 }) {
   const id = `intake-${label.replace(/\W+/g, '-').toLowerCase()}`;
   return (
@@ -886,10 +921,59 @@ function Field({
         className={`field ${error ? '!border-danger' : ''}`}
         value={value}
         inputMode={inputMode}
+        placeholder={placeholder}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
         onChange={(event) => onChange(event.target.value)}
       />
+      {error && (
+        <p id={`${id}-error`} className="mt-1 text-[11.5px] text-danger">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  required = false,
+  error,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  required?: boolean;
+  error?: string;
+  placeholder?: string;
+}) {
+  const id = `intake-${label.replace(/\W+/g, '-').toLowerCase()}`;
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
+        {label}
+        {required && <span className="ml-0.5 text-danger">*</span>}
+      </label>
+      <select
+        id={id}
+        className={`field ${error ? '!border-danger' : ''}`}
+        value={value}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {placeholder && <option value="">{placeholder}</option>}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
       {error && (
         <p id={`${id}-error`} className="mt-1 text-[11.5px] text-danger">
           {error}

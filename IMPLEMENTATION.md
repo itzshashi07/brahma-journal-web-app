@@ -81,6 +81,9 @@ src/
       dashboard, journal, meditation, affirmations, wisdom, thoughts,
       community, blogs/[id], library, counselling, notifications,
       profile, analytics, games
+      admin/              the operator console — counselling queue,
+                          article review, announcements. Drawn from the
+                          `admin` claim; every route behind it re-checks it
     login, signup, forgot-password
     sitemap.ts  robots.ts  manifest.ts  og/route.tsx
   components/
@@ -90,9 +93,12 @@ src/
     VerseCard.tsx         one Gita verse, shared by the public and app halves
     LegalDoc, AuthForm, Icon
     app/
-      AppShell            auth gate + navigation
+      AppShell            auth gate + navigation + the phone drawer
       ui.tsx              useApi, AsyncSection, Card, EmptyState, …
       NotificationBell
+      Avatar.tsx          the built avatar, in SVG — the app's `m:` encoding
+      AvatarPicker.tsx    presets first, seven option rows second
+      Dictation.tsx       Web Speech, for the journal
   content/                the words. Data, not JSX — see §5
     features.ts  use-cases.ts  legal.ts
     gita.ts               generated from the app's gita_verses.dart
@@ -104,6 +110,10 @@ src/
     public-api.ts         server-side reader for published articles
     auth-context.tsx      who is signed in
     seo.ts                metadata + JSON-LD builders
+    validate.ts           email, phone, age and the gender list — one
+                          definition, used by every form
+    chime.ts              the meditation bells, synthesised
+    notify-bus.ts         "the unread count changed" as a window event
 ```
 
 ---
@@ -209,6 +219,67 @@ website on a phone" from "an app": `touch-action: manipulation` on interactive
 elements (removing the ~300ms click delay), no tap highlight, no text-size
 adjust on rotation, and `overscroll-behavior-y: contain` so pulling down at the
 top of a feed does not reload the page and lose what was being typed.
+
+### The menu is a drawer, and the page behind it is frozen
+
+The phone menu used to be an ordinary block inside the sticky header, so the
+document stayed scrollable underneath it. Opening the menu and then flicking a
+thumb — which is what a thumb does — scrolled the page behind the menu, carried
+the header off the top of the screen with the menu attached to it, and left
+somebody looking at the middle of the page they had just tried to leave.
+
+It is now a fixed overlay with a backdrop and its own scroll, and `AppShell`
+freezes the body while it is open: `position: fixed` plus a captured scroll
+offset, rather than `overflow: hidden` alone, because iOS Safari ignores the
+latter on the scrolling element. The offset is restored on close, or the page
+jumps to the top and the member loses their place. The panel carries
+`overscroll-contain` so reaching the end of the list does not hand the scroll
+back to the page, and Escape closes it.
+
+### Avatars are drawn, not uploaded
+
+`components/app/Avatar.tsx` is a port of the app's `modern_avatars.dart` and
+`modern_avatar_art.dart`: seven small integers in `profile.avatarId`, encoded as
+`m:bg,skin,hair,hairColor,face,accessory,clothes`, rendered as inline SVG. The
+encoding is the app's on purpose — an avatar built in a browser appears on the
+handset and on the leaderboard, because it is one string on one profile record.
+
+Nothing is uploaded, so there is no storage bucket, no moderation queue and no
+image that can fail to load. Anything that is not an `m:` id — an empty field, or
+one of the older spiritual ids — falls back to initials on the brand gradient.
+The option indices are the wire format: they may be appended to and never
+reordered.
+
+### One definition of what an email and a phone number are
+
+`lib/validate.ts`. There were three forms asking for a phone number and three
+ideas of what one is; the counselling intake counted digits, the profile
+accepted anything, and sign-up trusted `<input type="email">`, which accepts
+`someone@gmail` because an address without a dot is legal HTML. The rules live in
+one file with the message written for the reader, and the intake, the profile
+and the auth form all use them — so a number accepted on one screen cannot be
+rejected on the next.
+
+### The meditation bells are synthesised
+
+`lib/chime.ts` — an oscillator, a fifth above it, and an exponential decay. A
+singing-bowl sample is a few hundred KB that has to be hosted, cached and
+licensed, and it fails silently on a slow connection at the exact moment it is
+needed: somebody sitting with their eyes closed waiting to be told the sitting is
+over. One bell on starting, a shorter one on ending early, and three rising notes
+on completion. The context is created inside the tap that starts the sitting,
+because a browser will not let a page make noise before it has been interacted
+with — and the completion bell has no gesture of its own to attach to.
+
+### The journal's mic is dictation, not a recording
+
+`components/app/Dictation.tsx`. Storing audio of somebody describing the worst
+part of their day is a different privacy promise from the one this product
+makes; what gets stored here is the sentence, and the audio never leaves the
+moment. Built on the Web Speech API, so it is absent on Firefox rather than
+present and broken, and it offers English and Hindi because a recogniser set to
+`en-IN` transcribes Hindi as nonsense rather than failing. Interim results are
+shown greyed under the field and never appended — they are revised as you speak.
 
 ---
 
@@ -383,23 +454,28 @@ Things that must move together:
 
 ## 10. Known gaps
 
-- **No web push.** The notification badge reads counts on mount and when the tab
-  becomes visible. Real web push needs a service worker, VAPID keys and a
-  permission prompt — a genuine feature, not a detail. There is deliberately no
-  polling interval; that would be strictly worse than the Firestore listeners the
-  whole architecture moved away from.
+- **No web push.** Real web push needs a service worker, VAPID keys and a
+  permission prompt — a genuine feature, not a detail. In its place the badge
+  reads `/notifications/unread` on mount, when the tab becomes visible, on a
+  45-second interval *while the tab is visible*, and immediately whenever
+  `lib/notify-bus.ts` reports that a feed was cleared or read. A backgrounded tab
+  has no timer at all.
 - **The app's legal copy still says Firestore in places.** This repo's version
   describes the current architecture. `legal_screen.dart` should be brought into
   line.
 - **No analytics.** Nothing is measured, which also means nothing is collected.
   If this changes, the privacy policy changes in the same commit.
-- **Meditation and focus are simplified** relative to the Flutter app — one timer
-  and one reaction game, against the app's fuller sets. The API is the same; the
-  screens are smaller.
-- **Still missing against the app:** the daily check-in sheet, the in-app support
-  ticket form and the account-deletion screen. `/wisdom` closed the largest of
-  these gaps; these three are what is left. Account deletion currently lives at
-  `docs/delete-account.html` in the workspace repo, which is the URL Google Play
-  points at — it should become a route here.
+- **Focus is simplified** relative to the Flutter app — one reaction game against
+  the app's fuller set. The API is the same; the screen is smaller. Meditation is
+  no longer in this list: six breathing patterns, a guide ring, bells and the
+  sitting streak are here now, and the one-minute option is deliberate.
+- **Still missing against the app:** the daily check-in sheet and the in-app
+  support ticket form. Account deletion is on `/app/profile`; the standalone
+  `docs/delete-account.html` in the workspace repo is still the URL Google Play
+  points at and should become a route here.
+- **The operator console covers three jobs, not every job.** Counselling
+  approvals, article review and announcements. The library catalogue
+  (`PUT /library/…`), support tickets and the leaderboard rebuild are all
+  admin-only routes with no web screen yet — they are still Android or curl.
 - **Purchases are Android-only.** The website shows what you own and opens it;
   buying happens in the app, where the payment signature is verified server-side.

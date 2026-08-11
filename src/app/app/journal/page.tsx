@@ -1,8 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 
+import {
+  DICTATION_LANGS,
+  DictationButton,
+  dictationSupported,
+} from '@/components/app/Dictation';
 import {
   AsyncSection,
   Card,
@@ -249,6 +254,16 @@ function EntryComposer({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Dictation language, chosen once for the whole entry.
+   *
+   * Per-field would be four selects for a choice nobody changes mid-entry. The
+   * Hindi option is not decoration: a good half of what gets written here is
+   * written in Hindi or Hinglish, and a recogniser set to `en-IN` transcribes
+   * Hindi as nonsense rather than failing, which is worse than not offering it.
+   */
+  const [lang, setLang] = useState<string>(DICTATION_LANGS[0].value);
+
   async function save() {
     setBusy(true);
     setError(null);
@@ -287,6 +302,26 @@ function EntryComposer({ onDone }: { onDone: () => void }) {
 
   return (
     <Card className="mb-5">
+      {dictationSupported() && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-hairline bg-bg-dark/40 px-3 py-2.5">
+          <p className="text-[12px] text-ink-secondary">
+            Too tired to type? Speak it instead — there is a mic on every box.
+          </p>
+          <select
+            aria-label="Dictation language"
+            className="ml-auto rounded-md border border-hairline bg-bg-dark/60 px-2.5 py-1 text-[12px] text-ink-secondary focus:border-primary focus:outline-none"
+            value={lang}
+            onChange={(event) => setLang(event.target.value)}
+          >
+            {DICTATION_LANGS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <p className="mb-3 text-[11px] uppercase tracking-wide text-ink-muted">
         How did today feel?
       </p>
@@ -317,18 +352,21 @@ function EntryComposer({ onDone }: { onDone: () => void }) {
           value={triggerThought}
           onChange={setTriggerThought}
           placeholder="The message I still have not answered."
+          lang={lang}
         />
         <TextField
           label="What did you do about it?"
           value={triggerResponse}
           onChange={setTriggerResponse}
           placeholder="Left it again. Will answer tomorrow morning."
+          lang={lang}
         />
         <TextField
           label="Best moment"
           value={bestMoment}
           onChange={setBestMoment}
           placeholder="Ten minutes on the balcony before anyone was up."
+          lang={lang}
         />
         <TextField
           label="Tiny step for tomorrow"
@@ -336,6 +374,7 @@ function EntryComposer({ onDone }: { onDone: () => void }) {
           onChange={setTinyStep}
           placeholder="Five minutes, not thirty."
           rows={1}
+          lang={lang}
         />
         <div>
           <label className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
@@ -374,28 +413,62 @@ function EntryComposer({ onDone }: { onDone: () => void }) {
   );
 }
 
+/**
+ * One prompt, typed or spoken.
+ *
+ * Dictation appends to whatever is already in the box rather than replacing it,
+ * so somebody can type half a sentence, dictate the rest, and correct it by
+ * hand afterwards. The interim text — what the recogniser thinks is being said
+ * right now — is shown underneath in grey rather than written into the field,
+ * because interim results are revised as you speak and appending them puts
+ * every hesitation into the entry twice.
+ */
 function TextField({
   label,
   value,
   onChange,
   placeholder,
   rows = 2,
+  lang,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   rows?: number;
+  lang?: string;
 }) {
   const id = `entry-${label.replace(/\W+/g, '-').toLowerCase()}`;
+  const [interim, setInterim] = useState('');
+
+  const append = useCallback(
+    (text: string) => {
+      if (!text) return;
+      onChange(
+        value ? `${value.replace(/\s+$/, '')} ${text}`.trim() : text
+      );
+    },
+    // `value` is a dependency on purpose: the callback has to close over the
+    // current text, or two dictated sentences overwrite each other.
+    [value, onChange]
+  );
+
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="mb-1.5 block text-[12px] font-medium text-ink-secondary"
-      >
-        {label}
-      </label>
+      <div className="mb-1.5 flex items-center gap-2">
+        <label htmlFor={id} className="text-[12px] font-medium text-ink-secondary">
+          {label}
+        </label>
+        <span className="ml-auto">
+          <DictationButton
+            lang={lang}
+            onFinal={append}
+            onInterim={setInterim}
+            label="Speak"
+          />
+        </span>
+      </div>
+
       <textarea
         id={id}
         rows={rows}
@@ -404,6 +477,12 @@ function TextField({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+
+      {interim && (
+        <p className="mt-1 text-[12px] italic text-ink-muted" aria-live="polite">
+          {interim}…
+        </p>
+      )}
     </div>
   );
 }

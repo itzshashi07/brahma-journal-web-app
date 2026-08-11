@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PenLine } from 'lucide-react';
 
 import {
@@ -47,13 +47,53 @@ const STATUS_LABEL = {
   rejected: 'Not approved',
 } as const;
 
+/**
+ * The categories offered in the composer.
+ *
+ * A suggestion list rather than a closed set — the field still accepts anything
+ * typed into it, and the API stores whatever arrives. But a free-text box with
+ * no examples produced "anxiety", "Anxiety", "anxiety " and "ANXIETY" as four
+ * different categories in the filter above, which is how a filter becomes
+ * useless without anybody doing anything wrong.
+ */
+const CATEGORIES = [
+  'Anxiety',
+  'Habits',
+  'Sleep',
+  'Overthinking',
+  'Relationships',
+  'Work & study',
+  'Self-worth',
+  'Recovery',
+];
+
 export default function BlogsPage() {
   const [writing, setWriting] = useState(false);
+  const [category, setCategory] = useState<string | null>(null);
 
   const state = useApi(
     () => api.get<Paged<Blog, 'blogs'>>('/api/blogs', { limit: 30 }),
     []
   );
+
+  /**
+   * The categories actually present, counted.
+   *
+   * Derived from the page in hand rather than fetched: `/api/blogs` accepts a
+   * `?category=` and filtering server-side would be a round trip per chip
+   * against a free-tier API that may be cold. Thirty cards is not enough data
+   * to be worth a request, and the count next to each name is only honest
+   * because it is counted from what is on screen.
+   */
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const blog of state.data?.blogs ?? []) {
+      const name = blog.category?.trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [state.data]);
 
   return (
     <>
@@ -80,25 +120,49 @@ export default function BlogsPage() {
         />
       )}
 
+      {categories.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <FilterChip active={category === null} onClick={() => setCategory(null)}>
+            All
+          </FilterChip>
+          {categories.map(([name, count]) => (
+            <FilterChip
+              key={name}
+              active={category === name}
+              onClick={() => setCategory(category === name ? null : name)}
+            >
+              {name}
+              <span className="rounded-pill bg-black/15 px-1.5 text-[10px] tabular-nums opacity-80">
+                {count}
+              </span>
+            </FilterChip>
+          ))}
+        </div>
+      )}
+
       <AsyncSection state={state}>
-        {(data) =>
-          data.blogs.length === 0 ? (
+        {(data) => {
+          const blogs = category
+            ? data.blogs.filter((blog) => blog.category?.trim() === category)
+            : data.blogs;
+
+          return blogs.length === 0 ? (
             <EmptyState
-              title="Nothing published yet"
+              title={category ? 'Nothing under that yet' : 'Nothing published yet'}
               body="Articles are written by members and reviewed before they appear. If you have something worth saying about getting through a hard stretch, write it."
               action={
                 <button
                   type="button"
-                  onClick={() => setWriting(true)}
+                  onClick={() => (category ? setCategory(null) : setWriting(true))}
                   className="btn-primary"
                 >
-                  Write the first one
+                  {category ? 'Show everything' : 'Write the first one'}
                 </button>
               }
             />
           ) : (
             <div className="space-y-3">
-              {data.blogs.map((blog) => (
+              {blogs.map((blog) => (
                 <Link
                   key={blog._id}
                   href={`/app/blogs/${blog._id}`}
@@ -148,10 +212,35 @@ export default function BlogsPage() {
                 </Link>
               ))}
             </div>
-          )
-        }
+          );
+        }}
       </AsyncSection>
     </>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 rounded-pill border px-3.5 py-1.5 text-[12px] font-medium transition ${
+        active
+          ? 'border-transparent bg-gradient-primary text-white'
+          : 'border-hairline text-ink-secondary hover:border-primary/50 hover:text-ink-primary'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -205,14 +294,23 @@ function Composer({ onDone }: { onDone: () => void }) {
           <label htmlFor="blog-category" className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
             Category
           </label>
+          {/* A list plus a text box: the list is what keeps the filter on the
+              listing usable, and the box is because nobody should be told their
+              subject is not on the menu. */}
           <input
             id="blog-category"
             className="field"
+            list="blog-categories"
             value={category}
             maxLength={60}
             onChange={(event) => setCategory(event.target.value)}
             placeholder="Anxiety, Habits, Sleep…"
           />
+          <datalist id="blog-categories">
+            {CATEGORIES.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </div>
 
         <div>

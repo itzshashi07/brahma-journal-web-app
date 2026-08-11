@@ -6,11 +6,9 @@ import {
   CallToAction,
   SectionHeading,
 } from '@/components/sections';
-import {
-  listArticles,
-  readingMinutes,
-} from '@/lib/public-api';
+import { listArticles } from '@/lib/public-api';
 import { breadcrumbSchema, jsonLdScript, pageMetadata } from '@/lib/seo';
+import { ArticleBrowser } from './ArticleBrowser';
 
 /**
  * One hour, written as a literal.
@@ -63,10 +61,6 @@ const trail = [
 export default async function SanctuaryIndexPage() {
   const articles = await listArticles(60);
 
-  const categories = Array.from(
-    new Set(articles.map((article) => article.category).filter(Boolean))
-  ) as string[];
-
   return (
     <>
       <script
@@ -88,20 +82,11 @@ export default async function SanctuaryIndexPage() {
           Hinglish as a real second version rather than a translation.
         </p>
 
-        {categories.length > 0 && (
-          <div className="mt-7 flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <span key={category} className="chip">
-                {category}
-              </span>
-            ))}
-          </div>
-        )}
       </section>
 
       <section className="py-8">
-        <div className="container-page">
-          {articles.length === 0 ? (
+        {articles.length === 0 ? (
+          <div className="container-page">
             <div className="glass p-10 text-center">
               <h2 className="text-lg font-semibold text-ink-primary">
                 The library is just starting
@@ -115,37 +100,13 @@ export default async function SanctuaryIndexPage() {
                 Write the first one
               </Link>
             </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {articles.map((article) => (
-                <Link
-                  key={article._id}
-                  href={`/sanctuary/${article._id}`}
-                  className="glass glass-hover flex flex-col p-5"
-                >
-                  {article.category && (
-                    <span className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-accent">
-                      {article.category}
-                    </span>
-                  )}
-                  <h2 className="text-[16px] font-semibold leading-snug text-ink-primary">
-                    {article.title}
-                  </h2>
-                  {article.excerpt && (
-                    <p className="mt-2 line-clamp-3 flex-1 text-[13px] leading-relaxed text-ink-secondary">
-                      {article.excerpt}
-                    </p>
-                  )}
-                  <p className="mt-4 text-[11px] text-ink-muted">
-                    {article.authorName || 'A member'} ·{' '}
-                    {readingMinutes(article.excerpt)} min read
-                    {article.titleHinglish ? ' · also in Hinglish' : ''}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          /* The chips used to be decoration. They filter now — see the note in
+             ArticleBrowser on why that happens in the browser rather than on
+             the server, and why every card is still in the initial HTML. */
+          <ArticleBrowser articles={articles} />
+        )}
       </section>
 
       <section className="py-14">

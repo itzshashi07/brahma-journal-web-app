@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/lib/auth-context';
 import { site } from '@/lib/site';
+import { emailProblem } from '@/lib/validate';
 
 type Mode = 'signin' | 'signup' | 'reset';
 
@@ -43,6 +44,20 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  /**
+   * Field-level problems, checked here before anything is sent.
+   *
+   * `<input type="email">` is not the check people assume it is: the HTML
+   * validity rules accept `someone@gmail` — no dot, no top-level domain —
+   * because a bare hostname is legal in an address. So somebody who typed their
+   * address one character short got a Firebase round trip, then
+   * `auth/invalid-email` translated into a sentence at the bottom of the form,
+   * with nothing marking the field that was wrong. Now the answer is instant and
+   * next to the box. See `lib/validate.ts` for the pattern and why it is not the
+   * RFC one.
+   */
+  const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
 
   /**
    * Only a relative path on this origin is accepted.
@@ -124,6 +139,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+
+    const problems: { email?: string; password?: string } = {};
+    const email_ = emailProblem(email);
+    if (email_) problems.email = email_;
+    if (mode !== 'reset' && password.length < 6) {
+      problems.password = 'At least six characters.';
+    }
+
+    setFieldError(problems);
+    if (Object.keys(problems).length) return;
+
     setBusy(true);
 
     try {
@@ -216,9 +242,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 label="Email"
                 type="email"
                 value={email}
-                onChange={setEmail}
+                onChange={(value) => {
+                  setEmail(value);
+                  // The message goes the moment they start fixing it. Leaving
+                  // it up while somebody corrects the address reads as though
+                  // the correction did not count.
+                  setFieldError((current) => ({ ...current, email: undefined }));
+                }}
                 autoComplete="email"
                 required
+                error={fieldError.email}
                 placeholder="you@example.com"
               />
 
@@ -227,12 +260,19 @@ export function AuthForm({ mode }: { mode: Mode }) {
                   label="Password"
                   type="password"
                   value={password}
-                  onChange={setPassword}
+                  onChange={(value) => {
+                    setPassword(value);
+                    setFieldError((current) => ({
+                      ...current,
+                      password: undefined,
+                    }));
+                  }}
                   autoComplete={
                     mode === 'signup' ? 'new-password' : 'current-password'
                   }
                   required
                   minLength={6}
+                  error={fieldError.password}
                   placeholder={
                     mode === 'signup' ? 'At least 6 characters' : '••••••••'
                   }
@@ -371,10 +411,12 @@ function Shell({ children }: { children: React.ReactNode }) {
 function Field({
   label,
   onChange,
+  error,
   ...props
 }: {
   label: string;
   value: string;
+  error?: string;
   onChange: (value: string) => void;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'>) {
   const id = `field-${label.replace(/\W+/g, '-').toLowerCase()}`;
@@ -388,10 +430,17 @@ function Field({
       </label>
       <input
         id={id}
-        className="field"
+        className={`field ${error ? '!border-danger' : ''}`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         onChange={(event) => onChange(event.target.value)}
         {...props}
       />
+      {error && (
+        <p id={`${id}-error`} className="mt-1 text-[11.5px] text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
