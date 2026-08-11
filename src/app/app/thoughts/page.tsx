@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Flag, MessageCircle, Send, ShieldOff } from 'lucide-react';
+import { Flag, MessageCircle, Send, ShieldOff, Trash2 } from 'lucide-react';
 
 import {
   AsyncSection,
@@ -53,6 +53,16 @@ type Thought = {
   replies: Reply[];
   replyCount: number;
   createdAt: string;
+  /**
+   * Whether the person reading this wrote it.
+   *
+   * The board carries no author and the authorship map is admin-only, so this
+   * is a question only the server can answer — and it answers it about the
+   * caller and nobody else. It is what allows a delete button to exist at all;
+   * the API checks authorship again before honouring the request, so a client
+   * that lied about this gets a 403.
+   */
+  mine?: boolean;
 };
 
 const NAMES = [
@@ -167,6 +177,7 @@ function ThoughtCard({
   thought: Thought;
   onReplied: () => void;
 }) {
+  const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
@@ -193,6 +204,28 @@ function ThoughtCard({
       onReplied();
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function remove() {
+    // A reflection is deleted for everyone and cannot be recovered, and the
+    // people in the thread lose the conversation with it. That is worth one
+    // question.
+    if (
+      !confirm(
+        'Delete this reflection? Any replies go with it, and this cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await api.delete(`/api/community/thoughts/${thought._id}`);
+      onReplied();
+    } catch {
+      alert('Could not delete that. Try again in a moment.');
+      setDeleting(false);
     }
   }
 
@@ -225,15 +258,30 @@ function ThoughtCard({
           · {timeAgo(thought.createdAt)}
         </span>
 
-        <button
-          type="button"
-          onClick={report}
-          className="ml-auto text-ink-muted transition hover:text-accent"
-          title="Report this"
-          aria-label="Report this reflection"
-        >
-          <Flag className="h-3.5 w-3.5" />
-        </button>
+        <div className="ml-auto flex items-center gap-3">
+          {thought.mine && (
+            <button
+              type="button"
+              onClick={remove}
+              disabled={deleting}
+              className="text-ink-muted transition hover:text-danger disabled:opacity-50"
+              title="Delete my reflection"
+              aria-label="Delete my reflection"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={report}
+            className="text-ink-muted transition hover:text-accent"
+            title="Report this"
+            aria-label="Report this reflection"
+          >
+            <Flag className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink-primary">

@@ -1,6 +1,9 @@
 import Link from 'next/link';
 
+import { comparisons } from '@/content/comparisons';
 import { features } from '@/content/features';
+import { GITA_SITUATIONS } from '@/content/gita';
+import { guides } from '@/content/guides';
 import { useCases } from '@/content/use-cases';
 import { site } from '@/lib/site';
 import { Logo } from './Logo';
@@ -24,7 +27,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-hairline bg-bg-dark/60">
       <div className="container-page py-14">
-        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-6">
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2.5">
               <Logo className="h-9 w-9" />
@@ -76,9 +79,32 @@ export function SiteFooter() {
             ))}
           </FooterColumn>
 
+          <FooterColumn title="Read">
+            <FooterLink href="/wisdom">The Gita by situation</FooterLink>
+            {GITA_SITUATIONS.slice(0, 4).map((s) => (
+              <FooterLink key={s.key} href={`/wisdom/${s.slug}`}>
+                {`Gita for ${s.labelEn.toLowerCase()}`}
+              </FooterLink>
+            ))}
+            <FooterLink href="/guides">Guides</FooterLink>
+            {guides.map((g) => (
+              <FooterLink key={g.slug} href={`/guides/${g.slug}`}>
+                {g.slug === 'mental-health-helplines-india'
+                  ? 'Helplines in India'
+                  : g.headline.replace(/\s*\(.*\)$/, '')}
+              </FooterLink>
+            ))}
+          </FooterColumn>
+
           <FooterColumn title="More">
             <FooterLink href="/download">Download</FooterLink>
             <FooterLink href="/sanctuary">Articles</FooterLink>
+            <FooterLink href="/compare">Compare</FooterLink>
+            {comparisons.map((c) => (
+              <FooterLink key={c.slug} href={`/compare/${c.slug}`}>
+                {`vs ${c.rival}`}
+              </FooterLink>
+            ))}
             <FooterLink href="/about">About</FooterLink>
             <FooterLink href="/support">Support</FooterLink>
             <FooterLink href="/privacy">Privacy</FooterLink>

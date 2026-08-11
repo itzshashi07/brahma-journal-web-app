@@ -1,7 +1,9 @@
 import type { MetadataRoute } from 'next';
 
+import { comparisons } from '@/content/comparisons';
 import { features } from '@/content/features';
 import { GITA_SITUATIONS } from '@/content/gita';
+import { guides } from '@/content/guides';
 import { useCases } from '@/content/use-cases';
 import { listArticleIndex } from '@/lib/public-api';
 import { absoluteUrl } from '@/lib/site';
@@ -41,6 +43,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { url: absoluteUrl('/features'), priority: 0.9, changeFrequency: 'monthly' },
       { url: absoluteUrl('/use-cases'), priority: 0.9, changeFrequency: 'monthly' },
       { url: absoluteUrl('/wisdom'), priority: 0.9, changeFrequency: 'monthly' },
+      { url: absoluteUrl('/guides'), priority: 0.9, changeFrequency: 'monthly' },
+      { url: absoluteUrl('/compare'), priority: 0.8, changeFrequency: 'monthly' },
       { url: absoluteUrl('/download'), priority: 0.9, changeFrequency: 'monthly' },
       { url: absoluteUrl('/sanctuary'), priority: 0.8, changeFrequency: 'daily' },
       { url: absoluteUrl('/about'), priority: 0.5, changeFrequency: 'yearly' },
@@ -71,6 +75,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
+  const guideRoutes: MetadataRoute.Sitemap = guides.map((g) => ({
+    url: absoluteUrl(`/guides/${g.slug}`),
+    lastModified: buildTime,
+    changeFrequency: 'monthly',
+    priority: 0.8,
+  }));
+
+  const compareRoutes: MetadataRoute.Sitemap = comparisons.map((c) => ({
+    url: absoluteUrl(`/compare/${c.slug}`),
+    lastModified: buildTime,
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }));
+
   // Fails soft — see `listArticleIndex`. A sitemap missing the article section
   // is recoverable on the next revalidation; a build that fails because the API
   // was asleep is not.
@@ -89,6 +107,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...featureRoutes,
     ...useCaseRoutes,
     ...wisdomRoutes,
+    ...guideRoutes,
+    ...compareRoutes,
     ...articleRoutes,
   ];
 }

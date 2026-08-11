@@ -146,6 +146,39 @@
     scroll-behavior: smooth;
     /* Anchored sections land below the sticky header rather than under it. */
     scroll-padding-top: 5rem;
+
+    /* ── The handful of properties that separate "a website on a phone" from
+       "an app" ─────────────────────────────────────────────────────────────
+
+       None of them are visible as design. All of them are noticeable as feel,
+       and their absence is what makes a good-looking site read as a web page
+       somebody has opened rather than a thing they are using. */
+
+    /* Safari enlarges text when a phone is turned to landscape, which reflows
+       a page mid-gesture for no reason anybody asked for. */
+    -webkit-text-size-adjust: 100%;
+
+    /* The grey flash a mobile browser paints over anything tapped. Native apps
+       do not do this; every button here already has its own pressed state. */
+    -webkit-tap-highlight-color: transparent;
+
+    /* Stops a scroll that reaches the end of the page from chaining into the
+       browser's rubber-band and pull-to-refresh. Inside the app half, pulling
+       down at the top of a feed should do nothing, not reload the page and
+       lose what somebody was typing. */
+    overscroll-behavior-y: contain;
+  }
+
+  /* Removes the ~300ms wait a mobile browser holds before firing a click, in
+     case the tap was going to become a double-tap zoom. It is the single
+     biggest reason taps feel slower on the web than in an app. */
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
 
   body {
@@ -272,6 +305,36 @@
      page body never scrolls sideways on a phone. */
   .scroll-x {
     @apply overflow-x-auto;
+  }
+
+  /**
+   * A row that scrolls sideways and stops where a card starts.
+   *
+   * Used for the filter chips and any horizontal shelf. `scroll-snap` is what
+   * makes a swipe end somewhere deliberate rather than halfway through a word,
+   * and the hidden scrollbar is because a visible one under a chip row is a
+   * desktop artefact on a surface that is dragged.
+   */
+  .shelf {
+    @apply flex snap-x snap-mandatory gap-2 overflow-x-auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .shelf::-webkit-scrollbar {
+    display: none;
+  }
+  .shelf > * {
+    @apply snap-start;
+  }
+
+  /* The home indicator on a modern phone sits over the bottom of the viewport.
+     Anything fixed down there needs to end above it, or it is a button that
+     cannot be pressed without dismissing the app. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .container-page {

@@ -53,9 +53,11 @@ export default function WisdomPage() {
       />
 
       {/* The filter row scrolls sideways rather than wrapping into four lines
-          on a phone, which is how the app's own chip row behaves. */}
-      <div className="-mx-5 mb-6 overflow-x-auto px-5 pb-1 sm:mx-0 sm:px-0">
-        <div className="flex w-max gap-2">
+          on a phone, which is how the app's own chip row behaves. It bleeds to
+          the screen edges so the last chip is not clipped by the page gutter —
+          a row that appears to end at the margin does not look scrollable. */}
+      <div className="-mx-4 mb-6 px-4 sm:mx-0 sm:px-0">
+        <div className="shelf pb-1">
           <FilterChip
             label="Everything"
             count={GITA_VERSES.length}

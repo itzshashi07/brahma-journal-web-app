@@ -31,6 +31,8 @@ import { ThemeToggle } from './ThemeToggle';
 const primaryNav = [
   { href: '/features', label: 'Features' },
   { href: '/use-cases', label: 'Use cases' },
+  { href: '/wisdom', label: 'Wisdom' },
+  { href: '/guides', label: 'Guides' },
   { href: '/sanctuary', label: 'Articles' },
   { href: '/download', label: 'Download' },
 ];

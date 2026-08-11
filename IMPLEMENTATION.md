@@ -71,11 +71,14 @@ src/
       page.tsx            home
       features/[slug]/    9 pages, from src/content/features.ts
       use-cases/[slug]/   7 pages, from src/content/use-cases.ts
+      wisdom/[situation]/ 12 pages, from src/content/gita.ts — see §5
+      guides/[slug]/      4 long-form guides, from src/content/guides.ts
+      compare/[slug]/     3 "X alternative" pages, from src/content/comparisons.ts
       sanctuary/[id]/     articles, from the API (ISR)
       download, about, support, privacy, terms
     app/                  everything behind sign-in
       layout.tsx          noindex + AppShell
-      dashboard, journal, meditation, affirmations, thoughts,
+      dashboard, journal, meditation, affirmations, wisdom, thoughts,
       community, blogs/[id], library, counselling, notifications,
       profile, analytics, games
     login, signup, forgot-password
@@ -83,6 +86,8 @@ src/
   components/
     SiteHeader, SiteFooter, Logo, StoreButtons, PhoneMockup,
     sections.tsx          the landing-page building blocks
+    ThemeToggle.tsx       the switch, and the pre-paint script — see §4
+    VerseCard.tsx         one Gita verse, shared by the public and app halves
     LegalDoc, AuthForm, Icon
     app/
       AppShell            auth gate + navigation
@@ -90,6 +95,8 @@ src/
       NotificationBell
   content/                the words. Data, not JSX — see §5
     features.ts  use-cases.ts  legal.ts
+    gita.ts               generated from the app's gita_verses.dart
+    guides.ts  comparisons.ts
   lib/
     site.ts               name, URLs, store links — one source
     firebase.ts           identity only, lazily initialised
@@ -154,6 +161,55 @@ that grows without anyone writing marketing copy.
 That is why `/api/public/blogs` exists in the backend. See
 [§7](#7-the-public-api-surface).
 
+### Two themes, and why there is not a `dark:` prefix anywhere
+
+The site used to be dark always, and this file used to argue for that: the app
+has no light mode, and a second palette is a second thing to keep in step across
+two repositories. That reasoning holds for the application half. It does not
+hold for the public pages, which people open in daylight, at work, beside twenty
+white tabs.
+
+The obvious implementation — `darkMode: 'class'` and a `dark:` variant on every
+colour utility — would have meant editing roughly four hundred class names
+across forty files, and leaving behind a codebase where the next surface colour
+means finding all four hundred again.
+
+So every colour token in `tailwind.config.ts` points at a CSS custom property
+and `globals.css` swaps the values. `bg-bg-card` is written once and is correct
+in both themes; no component knows a theme exists.
+
+Two details that are load-bearing:
+
+- **The channels are stored bare** — `--c-bg-card: 26 26 46`, not
+  `rgb(26 26 46)` — because that is what lets Tailwind compose
+  `rgb(var(--c-bg-card) / 0.6)` for `bg-bg-card/60`. About a hundred class names
+  here are translucent, and a variable holding a finished colour breaks every
+  one of them *silently*: the colour is right and the opacity is ignored.
+- **`ThemeScript` is a blocking inline script in `<head>`.** React runs after
+  the first paint, so applying the theme in an effect gives anybody on light a
+  full frame of near-black — on every navigation. It stamps an explicit
+  `dark`/`light` rather than leaving the attribute off for "system", so the CSS
+  needs one override block instead of the light palette written twice.
+
+The light palette is not the dark one inverted. The accents step *darker*
+against white — `--c-primary-light` becomes deeper than `--c-primary`, which
+reads backwards and is right, since the name means "the accent that stands out"
+— and the shadows go shallow and violet rather than deep and black.
+
+### The bottom tab bar
+
+`AppShell` renders a four-tab bar on phones. Four, not thirteen: a tab bar is
+for what somebody does daily, everything else stays in the menu, and five tabs
+on a narrow phone gives each a target smaller than a fingertip. It carries
+`pb-safe` for the home indicator, and `main` gets `pb-24` so the last card
+clears it.
+
+Alongside it, `globals.css` sets the handful of properties that separate "a
+website on a phone" from "an app": `touch-action: manipulation` on interactive
+elements (removing the ~300ms click delay), no tap highlight, no text-size
+adjust on rotation, and `overscroll-behavior-y: contain` so pulling down at the
+top of a feed does not reload the page and lose what was being typed.
+
 ---
 
 ## 5. Content is data
@@ -173,6 +229,31 @@ the app offers for it. They do not diagnose, do not claim treatment, and carry a
 crisis note where the subject warrants it. That is partly Play Store policy for
 a health-adjacent app and mostly because the alternative is telling somebody in
 trouble that a journalling app is medicine.
+
+
+### The Gita section is generated, not written
+
+`src/content/gita.ts` is `lib/core/constants/gita_verses.dart` from the app
+repo, converted by script rather than retyped. A dropped matra in the Sanskrit
+or the Hindi is invisible in review and is not a mistake a spiritual product
+gets to make. If a verse changes there, regenerate rather than edit here.
+
+The same data renders in three places: `/app/wisdom` (filterable, private),
+`/wisdom` (the hub) and `/wisdom/[situation]` (twelve indexed pages). Arranged
+by situation rather than by chapter, because nobody at 2am searches for
+"Chapter 2, Verse 47" — they search for what is happening to them.
+
+### Guides and comparisons have rules
+
+`guides.ts` holds pages that answer the whole question with nothing held back
+for a signup — a page that withholds the answer earns a back button. One of
+them, the India helpline list, carries no call to action at all and a
+`verifiedOn` date, because a wrong number in an emergency is worse than no page.
+
+`comparisons.ts` states what the rival does better, in the first column, at the
+same size. It quotes no prices: subscription pricing changes by region and
+quarter, and a page naming a competitor's price is wrong within months while it
+carries on ranking.
 
 ---
 
@@ -278,7 +359,19 @@ commits to two remotes** — there is no monorepo tooling doing it for you.
 
 Things that must move together:
 
-- **Design tokens.** `app_theme.dart` ↔ `tailwind.config.ts`.
+- **Design tokens.** `app_theme.dart` ↔ the dark palette in `globals.css`. The
+  values moved out of `tailwind.config.ts` when the light theme arrived — that
+  file now holds the *names*, and `:root` holds the numbers.
+- **The mark.** `assets/app_icon.png` ↔ `src/components/Logo.tsx`, `public/icon.svg`
+  and `public/icon-maskable.svg`. The site drew a lotus for months while the app
+  shipped three inward arcs; a near-miss on a brand mark is worse than an
+  unrelated one, because the eye reads it as the same thing rendered wrong.
+- **The Gita verses.** `gita_verses.dart` → `src/content/gita.ts`, by script.
+  Regenerate; do not hand-edit.
+- **CORS.** This origin has to be in the API's allow list. It is now the
+  *default* rather than something to configure, because an unset variable used
+  to silently switch this whole half of the product off — every request answered
+  and then discarded by the browser, with the server logs showing 200s.
 - **Legal copy.** `legal_screen.dart` ↔ `src/content/legal.ts`. A privacy policy
   that differs between an app and its website is not a policy, it is two drafts,
   and the difference is what a regulator asks about.
@@ -303,5 +396,10 @@ Things that must move together:
 - **Meditation and focus are simplified** relative to the Flutter app — one timer
   and one reaction game, against the app's fuller sets. The API is the same; the
   screens are smaller.
+- **Still missing against the app:** the daily check-in sheet, the in-app support
+  ticket form and the account-deletion screen. `/wisdom` closed the largest of
+  these gaps; these three are what is left. Account deletion currently lives at
+  `docs/delete-account.html` in the workspace repo, which is the URL Google Play
+  points at — it should become a route here.
 - **Purchases are Android-only.** The website shows what you own and opens it;
   buying happens in the app, where the payment signature is verified server-side.

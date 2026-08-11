@@ -182,11 +182,70 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </header>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        {/* `pb-24` on phones so the last card clears the tab bar below. */}
+        <main className="flex-1 px-4 pb-24 pt-6 sm:px-6 sm:py-8 lg:pb-8">
           <div className="mx-auto w-full max-w-4xl">{children}</div>
         </main>
+
+        <BottomTabs pathname={pathname} />
       </div>
     </div>
+  );
+}
+
+/**
+ * The bottom tab bar, on phones only.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Why this exists when there is already a menu
+ *
+ * A hamburger is a web convention. Every app this one sits next to on a home
+ * screen — including its own Android build — puts the four things you do daily
+ * within thumb reach at the bottom of the screen, and a member who moves
+ * between the two should not have to change how they hold the phone.
+ *
+ * Four, not thirteen. A tab bar is for the things done every day; everything
+ * else stays in the menu, which is still there. Five tabs on a narrow phone
+ * gives each one a target smaller than a fingertip, which is how a tab bar
+ * becomes slower than the menu it replaced.
+ *
+ * The `pb-safe` is the home indicator: without it the labels sit under the bar
+ * iOS draws across the bottom of the screen.
+ */
+function BottomTabs({ pathname }: { pathname: string }) {
+  const tabs = [
+    { href: '/app/dashboard', label: 'Today', icon: Flame },
+    { href: '/app/journal', label: 'Journal', icon: NotebookPen },
+    { href: '/app/meditation', label: 'Sit', icon: Brain },
+    { href: '/app/thoughts', label: 'Board', icon: MessagesSquare },
+  ];
+
+  return (
+    <nav
+      aria-label="Primary"
+      className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-bg-dark/90 backdrop-blur-xl lg:hidden"
+    >
+      <div className="flex">
+        {tabs.map(({ href, label, icon: Glyph }) => {
+          const active = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              // min-h-[3.25rem] keeps every target comfortably past the 44px
+              // that a fingertip actually needs.
+              className={`flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors active:bg-bg-card/60 ${
+                active ? 'text-primary-light' : 'text-ink-muted'
+              }`}
+            >
+              <Glyph className="h-[18px] w-[18px]" />
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
