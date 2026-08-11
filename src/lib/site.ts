@@ -47,12 +47,30 @@ export const site = {
    */
   url: (() => {
     const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
-    if (explicit) return explicit;
-
     const vercel = process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
-    if (vercel) return `https://${vercel.replace(/\/$/, '')}`;
+    const hosted = vercel ? `https://${vercel.replace(/\/$/, '')}` : null;
 
-    return 'https://innenflow.app';
+    /**
+     * A localhost origin is a correct answer in `next dev` and never a correct
+     * answer in a build that is being served to the public.
+     *
+     * This guard is here because it happened: `.env.local` was copied into the
+     * Vercel project's environment variables, `NEXT_PUBLIC_SITE_URL` came along
+     * with it, and the deployed site published `<link rel="canonical"
+     * href="http://localhost:3001/…">` on every page — an instruction to a
+     * crawler to index a URL that exists only on one laptop.
+     *
+     * Nothing about the site looked wrong. It renders identically. The only
+     * place it appears is the head, and the only reader that cares is a
+     * crawler, which is what makes it worth a guard in code rather than a note
+     * in a README.
+     */
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$|\/)/i;
+    const deployed = Boolean(hosted) || process.env.NODE_ENV === 'production';
+
+    if (explicit && !(isLocal.test(explicit) && deployed)) return explicit;
+
+    return hosted ?? 'https://innenflow.app';
   })(),
 
   description:
