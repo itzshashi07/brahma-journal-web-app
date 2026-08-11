@@ -3,20 +3,138 @@
 @tailwind utilities;
 
 /**
- * The site is dark, always.
+ * Two themes, one set of class names.
  *
- * Not a preference toggle that defaults to dark — genuinely one theme. The
- * Android app has no light mode either, and the whole point of the website is
- * that it is the same product. A light variant would be a second design to keep
- * in step with a design that lives in another language in another repository,
- * which is how the two drift apart.
+ * ─────────────────────────────────────────────────────────────────────────
+ * How this works
  *
- * `color-scheme: dark` is what stops the browser painting white scrollbars,
- * white form controls and a white flash before the CSS lands.
+ * Every colour in `tailwind.config.ts` points at a variable defined here, so
+ * `bg-bg-card` and `text-ink-primary` are written once in the components and
+ * are correct in both themes. Switching is this file swapping values; no
+ * component contains a `dark:` prefix or knows a theme exists.
+ *
+ * Dark is the base — it is what the Android app is, and the site should look
+ * like the product by default. Light is an override under `[data-theme='light']`,
+ * which `ThemeScript` stamps on `<html>` before first paint.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Why the channels are bare numbers
+ *
+ * `--c-bg-card: 26 26 46` rather than a finished colour, so Tailwind can
+ * compose `rgb(var(--c-bg-card) / 0.6)` for `bg-bg-card/60`. Around a hundred
+ * class names on this site are translucent; a variable holding `rgb(...)`
+ * breaks every one of them silently — the colour is right and the opacity is
+ * simply ignored.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * On the light palette
+ *
+ * It is not the dark one inverted. Violet on near-black can be bright, because
+ * it is a light on a dark ground; the same violet on white is a stain. So the
+ * accent colours step *darker* in light mode (`--c-primary-light` becomes a
+ * deeper violet than `--c-primary`, which reads backwards and is correct — the
+ * name means "the accent that stands out", and against white that is darker),
+ * and the shadows become shallow and violet-tinted rather than deep and black.
  */
 :root {
   color-scheme: dark;
   --font-outfit: 'Outfit', system-ui, sans-serif;
+
+  /* Brand */
+  --c-primary: 124 58 237; /* #7C3AED */
+  --c-primary-light: 159 103 250; /* #9F67FA */
+  --c-primary-dark: 91 33 182; /* #5B21B6 */
+  --c-accent: 245 158 11; /* #F59E0B */
+  --c-accent-light: 251 191 36; /* #FBBF24 */
+
+  /* Surfaces */
+  --c-bg: 13 13 26; /* #0D0D1A */
+  --c-bg-card: 26 26 46; /* #1A1A2E */
+  --c-bg-card-light: 22 33 62; /* #16213E */
+  --c-bg-surface: 15 52 96; /* #0F3460 */
+
+  /* Text */
+  --c-ink: 248 248 255; /* #F8F8FF */
+  --c-ink-secondary: 176 176 204; /* #B0B0CC */
+  --c-ink-muted: 107 107 138; /* #6B6B8A */
+
+  /* Structure */
+  --c-hairline: 45 45 78; /* #2D2D4E */
+  --c-hairline-soft: 35 35 63; /* #23233F */
+
+  /* Sacred motif inks */
+  --c-sacred-glow: 59 42 107; /* #3B2A6B */
+  --c-sacred-ink: 20 16 31; /* #14101F */
+
+  --c-success: 16 185 129;
+  --c-danger: 185 28 28;
+
+  /* Mood */
+  --c-mood-very-sad: 99 102 241;
+  --c-mood-sad: 139 92 246;
+  --c-mood-neutral: 245 158 11;
+  --c-mood-happy: 16 185 129;
+  --c-mood-very-happy: 6 214 160;
+
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 28px 2px rgba(124, 58, 237, 0.35);
+  --shadow-glow-gold: 0 0 28px 2px rgba(245, 158, 11, 0.35);
+
+  --page-gradient: linear-gradient(180deg, #0d0d1a 0%, #1a1a2e 55%, #0f3460 100%);
+  --page-wash: radial-gradient(
+    120% 80% at 50% -10%,
+    rgba(124, 58, 237, 0.18) 0%,
+    transparent 55%
+  );
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --c-primary: 109 40 217; /* #6D28D9 — one step down, for contrast on white */
+  --c-primary-light: 124 58 237; /* #7C3AED */
+  --c-primary-dark: 76 29 149; /* #4C1D95 */
+  /* Amber is unreadable as text on white. The accent keeps its hue and loses
+     its brightness, so "gold" still reads as gold and still passes contrast. */
+  --c-accent: 180 83 9; /* #B45309 */
+  --c-accent-light: 146 64 14; /* #92400E */
+
+  /* Not pure white. A violet-tinted paper keeps the family resemblance to the
+     dark theme and is easier to sit in front of at night. */
+  --c-bg: 247 246 251; /* #F7F6FB */
+  --c-bg-card: 255 255 255;
+  --c-bg-card-light: 243 241 250; /* #F3F1FA */
+  --c-bg-surface: 233 229 246; /* #E9E5F6 */
+
+  --c-ink: 23 20 38; /* #171426 */
+  --c-ink-secondary: 74 71 99; /* #4A4763 */
+  --c-ink-muted: 118 114 145; /* #767291 */
+
+  --c-hairline: 224 220 240; /* #E0DCF0 */
+  --c-hairline-soft: 238 235 248; /* #EEEBF8 */
+
+  --c-sacred-glow: 221 213 246; /* #DDD5F6 */
+  --c-sacred-ink: 244 242 252; /* #F4F2FC */
+
+  --c-success: 4 120 87;
+  --c-danger: 153 27 27;
+
+  --c-mood-very-sad: 79 70 229;
+  --c-mood-sad: 124 58 237;
+  --c-mood-neutral: 180 83 9;
+  --c-mood-happy: 4 120 87;
+  --c-mood-very-happy: 5 150 105;
+
+  --shadow-soft: 0 8px 24px rgba(76, 29, 149, 0.1);
+  --shadow-glow: 0 0 24px 1px rgba(124, 58, 237, 0.18);
+  --shadow-glow-gold: 0 0 24px 1px rgba(180, 83, 9, 0.16);
+
+  --page-gradient: linear-gradient(180deg, #ffffff 0%, #f7f6fb 55%, #eee9fa 100%);
+  --page-wash: radial-gradient(
+    120% 80% at 50% -10%,
+    rgba(124, 58, 237, 0.1) 0%,
+    transparent 55%
+  );
 }
 
 @layer base {
@@ -35,9 +153,10 @@
     /* Fixed, so the gradient belongs to the window rather than to the document
        — otherwise a long marketing page stretches it into flat colour. */
     background-attachment: fixed;
-    background-image:
-      radial-gradient(120% 80% at 50% -10%, rgba(124, 58, 237, 0.18) 0%, transparent 55%),
-      linear-gradient(180deg, #0d0d1a 0%, #1a1a2e 55%, #0f3460 100%);
+    background-image: var(--page-wash), var(--page-gradient);
+    /* The theme switch should feel like the light changing rather than like a
+       page reload. Colours only — never layout. */
+    transition: background-color 200ms ease, color 200ms ease;
   }
 
   ::selection {

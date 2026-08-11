@@ -1,15 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- The app's launcher mark. Kept byte-for-byte in step with
+       src/components/Logo.tsx — a favicon that disagrees with the header logo
+       is the version people see in a tab strip all day. -->
   <defs>
-    <linearGradient id="p" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#9F67FA"/><stop offset="100%" stop-color="#4338CA"/>
+    <linearGradient id="o" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C6BF0"/><stop offset="100%" stop-color="#4338CA"/>
     </linearGradient>
-    <linearGradient id="c" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FBBF24"/><stop offset="100%" stop-color="#F59E0B"/>
+    <linearGradient id="m" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#C4B5FD"/><stop offset="100%" stop-color="#9F67FA"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1B1B3A"/><stop offset="100%" stop-color="#0D0D1A"/>
     </linearGradient>
   </defs>
-  <rect width="48" height="48" rx="11" fill="#0D0D1A"/>
-  <path d="M24 8c4.4 5.3 6.6 10.1 6.6 14.5S28 32 24 36.5c-4-4.5-6.6-9.2-6.6-13.6S19.6 13.3 24 8Z" fill="url(#p)" opacity=".95"/>
-  <path d="M10.8 17.6c5.7 1.3 9.7 4 11.9 7.5S24.6 33.6 23.7 37c-3.5-1.3-7.5-4.4-9.2-7.9s-3.5-7.9-3.7-11.5Z" fill="url(#p)" opacity=".6"/>
-  <path d="M37.2 17.6c-5.7 1.3-9.7 4-11.9 7.5S23.4 33.6 24.3 37c3.5-1.3 7.5-4.4 9.2-7.9s3.5-7.9 3.7-11.5Z" fill="url(#p)" opacity=".6"/>
-  <circle cx="24" cy="25.3" r="2.9" fill="url(#c)"/>
+  <rect width="48" height="48" rx="11" fill="url(#bg)"/>
+  <g fill="none" stroke-linecap="round">
+    <circle cx="24" cy="24" r="15.2" stroke="url(#o)" stroke-width="2.9" pathLength="100" stroke-dasharray="73 27" transform="rotate(-108 24 24)"/>
+    <circle cx="24" cy="24" r="10.2" stroke="url(#m)" stroke-width="2.8" pathLength="100" stroke-dasharray="78 22" transform="rotate(72 24 24)"/>
+    <circle cx="24" cy="24" r="5.6" stroke="#CFC2FE" stroke-width="2.4" pathLength="100" stroke-dasharray="66 34" transform="rotate(-116 24 24)"/>
+  </g>
+  <circle cx="24" cy="24" r="2.9" fill="#EDEBFF"/>
 </svg>

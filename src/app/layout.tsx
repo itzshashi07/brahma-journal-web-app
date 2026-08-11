@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Outfit } from 'next/font/google';
 
+import { ThemeScript } from '@/components/ThemeToggle';
 import { AuthProvider } from '@/lib/auth-context';
 import {
   jsonLdScript,
@@ -101,8 +102,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0D0D1A',
-  colorScheme: 'dark',
+  // The browser chrome follows the page. One fixed value would put a near-black
+  // address bar above a white page for anybody on the light theme, which is the
+  // most visible half-finished thing a theme switch can leave behind.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F7F6FB' },
+    { media: '(prefers-color-scheme: dark)', color: '#0D0D1A' },
+  ],
+  colorScheme: 'dark light',
   width: 'device-width',
   initialScale: 1,
   // Not capped. Locking zoom on a text-heavy site is an accessibility failure
@@ -118,6 +125,9 @@ export default function RootLayout({
   return (
     <html lang="en-IN" className={outfit.variable} suppressHydrationWarning>
       <head>
+        {/* Before anything is painted. See the note in ThemeToggle.tsx. */}
+        <ThemeScript />
+
         {/*
           Site-wide structured data.
 

@@ -10,6 +10,7 @@ import { site } from '@/lib/site';
 import { features } from '@/content/features';
 import { useCases } from '@/content/use-cases';
 import { Logo } from './Logo';
+import { ThemeToggle } from './ThemeToggle';
 
 /**
  * The marketing header.
@@ -100,6 +101,10 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
+          {/* Hidden on the narrowest screens, where the row is already the
+              logo, two buttons and a menu — it reappears inside that menu. */}
+          <ThemeToggle className="hidden sm:inline-flex" />
+
           {/* `loading` avoids the flash where a signed-in member is briefly
               shown "Sign in" before the auth state resolves. */}
           {!loading && user ? (
@@ -170,6 +175,11 @@ export function SiteHeader() {
                 {useCase.name}
               </Link>
             ))}
+
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-hairline px-3 pt-4 sm:hidden">
+              <span className="text-[13px] text-ink-secondary">Theme</span>
+              <ThemeToggle />
+            </div>
           </nav>
         </div>
       )}

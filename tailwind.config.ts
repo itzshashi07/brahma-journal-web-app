@@ -1,19 +1,38 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * The app's design tokens, ported verbatim.
+ * The app's design tokens, ported verbatim — and then made switchable.
  *
- * Every value here is copied from `lib/core/theme/app_theme.dart` in the
+ * Every dark value here is copied from `lib/core/theme/app_theme.dart` in the
  * Flutter app. That is the point of the file: somebody who uses the phone app
  * and then opens the website should not be able to tell that one of them is
  * Flutter and the other is CSS. A near-miss on the purple is more noticeable
  * than a completely different design would be, because the eye reads it as the
  * same thing rendered wrong.
  *
- * If a colour changes in `app_theme.dart`, it changes here. There is no build
- * step keeping them in step — the two codebases do not share a package — so
- * this is a convention, and it is written down for that reason.
+ * If a colour changes in `app_theme.dart`, it changes in `globals.css` — which
+ * is where the values now live.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Why every colour is a variable rather than a hex
+ *
+ * The site gained a light theme. The obvious way to do that in Tailwind is
+ * `darkMode: 'class'` and a `dark:` prefix on every colour utility — which
+ * would have meant editing roughly four hundred class names across forty files,
+ * and leaving behind a codebase where adding a third surface means finding all
+ * four hundred again.
+ *
+ * Instead the tokens point at CSS custom properties and `globals.css` swaps the
+ * values. `bg-bg-card` is written once and is correct in both themes; nothing
+ * in any component knows a theme exists.
+ *
+ * The channels are stored bare — `26 26 46`, not `rgb(26 26 46)` — because that
+ * is what lets `<alpha-value>` work. Roughly a hundred class names here are
+ * translucent (`bg-bg-card/60`, `border-primary/50`), and a variable holding a
+ * complete colour function silently breaks every one of them.
  */
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
@@ -21,53 +40,55 @@ const config: Config = {
       colors: {
         // Brand
         primary: {
-          DEFAULT: '#7C3AED',
-          light: '#9F67FA',
-          dark: '#5B21B6',
+          DEFAULT: token('c-primary'),
+          light: token('c-primary-light'),
+          dark: token('c-primary-dark'),
         },
         accent: {
-          DEFAULT: '#F59E0B',
-          light: '#FBBF24',
+          DEFAULT: token('c-accent'),
+          light: token('c-accent-light'),
         },
 
-        // Backgrounds
+        // Backgrounds. `bg-dark` keeps its name in both themes — it is the page
+        // ground, and renaming it would touch every file this refactor exists
+        // to avoid touching.
         bg: {
-          dark: '#0D0D1A',
-          card: '#1A1A2E',
-          cardLight: '#16213E',
-          surface: '#0F3460',
+          dark: token('c-bg'),
+          card: token('c-bg-card'),
+          cardLight: token('c-bg-card-light'),
+          surface: token('c-bg-surface'),
         },
 
         // Text
         ink: {
-          primary: '#F8F8FF',
-          secondary: '#B0B0CC',
-          muted: '#6B6B8A',
+          primary: token('c-ink'),
+          secondary: token('c-ink-secondary'),
+          muted: token('c-ink-muted'),
         },
 
         // Structure
         hairline: {
-          DEFAULT: '#2D2D4E',
-          soft: '#23233F',
+          DEFAULT: token('c-hairline'),
+          soft: token('c-hairline-soft'),
         },
 
         // Sacred motif inks — a hint of gold in the violet, so the dark theme
         // reads warm rather than as cold blue-grey.
         sacred: {
-          glow: '#3B2A6B',
-          ink: '#14101F',
+          glow: token('c-sacred-glow'),
+          ink: token('c-sacred-ink'),
         },
 
-        success: '#10B981',
-        danger: '#B91C1C',
+        success: token('c-success'),
+        danger: token('c-danger'),
 
         // The five mood colours the journal and analytics render.
         mood: {
-          verySad: '#6366F1',
-          sad: '#8B5CF6',
-          neutral: '#F59E0B',
-          happy: '#10B981',
-          veryHappy: '#06D6A0',
+          verySad: token('c-mood-very-sad'),
+          sad: token('c-mood-sad'),
+          neutral: token('c-mood-neutral'),
+          happy: token('c-mood-happy'),
+          veryHappy: token('c-mood-very-happy'),
         },
       },
 
@@ -80,17 +101,22 @@ const config: Config = {
       },
 
       boxShadow: {
-        // Dark themes need shadow that reads as depth rather than as dirt, so
-        // it is deep and very diffuse. Matches AppTheme.shadowSoft.
-        soft: '0 8px 24px rgba(0, 0, 0, 0.45)',
-        glow: '0 0 28px 2px rgba(124, 58, 237, 0.35)',
-        glowGold: '0 0 28px 2px rgba(245, 158, 11, 0.35)',
+        // A dark theme needs shadow that reads as depth rather than as dirt —
+        // deep and very diffuse. A light one needs the opposite: shallow, and
+        // tinted violet rather than grey, because pure black at low opacity on
+        // white reads as smudge. Hence a variable rather than one value trying
+        // to be right twice.
+        soft: 'var(--shadow-soft)',
+        glow: 'var(--shadow-glow)',
+        glowGold: 'var(--shadow-glow-gold)',
       },
 
       backgroundImage: {
+        // The brand gradients are the brand in both themes and do not flip.
         'gradient-primary': 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
         'gradient-gold': 'linear-gradient(135deg, #F59E0B 0%, #F97316 100%)',
-        'gradient-bg': 'linear-gradient(180deg, #0D0D1A 0%, #1A1A2E 55%, #0F3460 100%)',
+        // The page ground does flip. See `--page-gradient` in globals.css.
+        'gradient-bg': 'var(--page-gradient)',
       },
 
       fontFamily: {

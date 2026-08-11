@@ -15,6 +15,7 @@ import {
   Menu,
   MessagesSquare,
   NotebookPen,
+  ScrollText,
   Sparkles,
   Trophy,
   User,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { Logo } from '@/components/Logo';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/lib/auth-context';
 import { NotificationBell } from './NotificationBell';
 
@@ -46,6 +48,7 @@ const nav = [
   { href: '/app/journal', label: 'Journal', icon: NotebookPen },
   { href: '/app/meditation', label: 'Meditate', icon: Brain },
   { href: '/app/affirmations', label: 'Affirmations', icon: Sparkles },
+  { href: '/app/wisdom', label: 'Wisdom', icon: ScrollText },
   { href: '/app/thoughts', label: 'Reflections', icon: MessagesSquare },
   { href: '/app/community', label: 'Community', icon: Trophy },
   { href: '/app/blogs', label: 'Sanctuary', icon: BookOpen },
@@ -142,6 +145,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="ml-auto hidden text-[13px] text-ink-secondary sm:block">
               {profile?.name ? `Hello, ${profile.name}` : 'Welcome back'}
             </p>
+
+            <ThemeToggle className="ml-auto sm:ml-0" />
 
             {typeof profile?.streak === 'number' && profile.streak > 0 && (
               <span className="chip !py-1 text-[11px]">
