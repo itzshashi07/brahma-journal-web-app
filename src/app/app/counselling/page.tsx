@@ -1,0 +1,498 @@
+'use client';
+
+import { useState } from 'react';
+import { Clock, Send, Trash2 } from 'lucide-react';
+
+import {
+  AsyncSection,
+  Card,
+  EmptyState,
+  PageHeader,
+  timeAgo,
+  useApi,
+} from '@/components/app/ui';
+import { api, type Paged } from '@/lib/api';
+
+/**
+ * Counselling.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * The two-hour purge is the feature
+ *
+ * The whole transcript is destroyed two hours after the session ends. The
+ * deadline is stamped by the server, not by this browser, and a MongoDB expiry
+ * index does the deleting whether or not anybody opens the app again — so it is
+ * a property of the data rather than a promise this client keeps.
+ *
+ * The countdown shown here is derived from `purgeAfter` on the session. It is
+ * for reassurance; it does not cause the deletion.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Roles are the server's
+ *
+ * `POST /messages` takes text and nothing else. Whether a message is filed as
+ * `member` or `admin` is derived from the verified token, so this client cannot
+ * label its own message as coming from a counsellor.
+ */
+
+type Session = {
+  _id: string;
+  name?: string;
+  concern?: string;
+  status: string;
+  mode?: string;
+  meetLink?: string;
+  amount?: number;
+  purgeAfter?: string | null;
+  lastMessagePreview?: string;
+  createdAt: string;
+};
+
+type Message = {
+  _id: string;
+  sender: 'member' | 'admin' | 'system';
+  kind?: string;
+  text: string;
+  createdAt: string;
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  awaiting_payment: 'Awaiting payment',
+  payment_submitted: 'Payment being verified',
+  approved: 'Approved — choose a format',
+  meet_requested: 'Call requested',
+  active: 'Session live',
+  ended: 'Ended',
+  rejected: 'Payment not verified',
+};
+
+export default function CounsellingPage() {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [intake, setIntake] = useState(false);
+
+  const sessions = useApi(
+    () =>
+      api.get<Paged<Session, 'sessions'>>('/api/counselling/sessions', {
+        limit: 20,
+      }),
+    []
+  );
+
+  if (openId) {
+    return (
+      <Chat
+        sessionId={openId}
+        onBack={async () => {
+          setOpenId(null);
+          await sessions.reload();
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Counselling"
+        subtitle="A private session with a real counsellor. The whole transcript is destroyed two hours after it ends."
+        action={
+          <button
+            type="button"
+            onClick={() => setIntake((value) => !value)}
+            className={intake ? 'btn-ghost !py-2.5' : 'btn-primary !py-2.5'}
+          >
+            {intake ? 'Cancel' : 'Book a session'}
+          </button>
+        }
+      />
+
+      {intake && (
+        <Intake
+          onDone={async () => {
+            setIntake(false);
+            await sessions.reload();
+          }}
+        />
+      )}
+
+      <AsyncSection state={sessions}>
+        {(data) =>
+          data.sessions.length === 0 ? (
+            <EmptyState
+              title="No sessions yet"
+              body="A thirty-minute conversation with a counsellor, by chat or video. Two hours after it ends, the entire transcript is deleted — not archived."
+              action={
+                <button
+                  type="button"
+                  onClick={() => setIntake(true)}
+                  className="btn-primary"
+                >
+                  Book one
+                </button>
+              }
+            />
+          ) : (
+            <div className="space-y-3">
+              {data.sessions.map((session) => (
+                <button
+                  key={session._id}
+                  type="button"
+                  onClick={() => setOpenId(session._id)}
+                  className="glass glass-hover block w-full p-5 text-left"
+                >
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="rounded-pill bg-primary/20 px-2.5 py-0.5 text-[10px] font-semibold text-primary-light">
+                      {STATUS_LABEL[session.status] ?? session.status}
+                    </span>
+                    {session.purgeAfter && (
+                      <span className="inline-flex items-center gap-1 rounded-pill bg-accent/15 px-2.5 py-0.5 text-[10px] font-semibold text-accent">
+                        <Clock className="h-3 w-3" />
+                        {purgeCountdown(session.purgeAfter)}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[14.5px] font-semibold text-ink-primary">
+                    {session.concern || 'Counselling session'}
+                  </p>
+                  {session.lastMessagePreview && (
+                    <p className="mt-1 line-clamp-1 text-[12.5px] text-ink-secondary">
+                      {session.lastMessagePreview}
+                    </p>
+                  )}
+                  <p className="mt-2 text-[11px] text-ink-muted">
+                    Opened {timeAgo(session.createdAt)}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )
+        }
+      </AsyncSection>
+
+      <p className="mt-8 text-center text-[11.5px] leading-relaxed text-ink-muted">
+        This is a conversation for support and perspective, not clinical
+        treatment. If you are in danger, call Tele-MANAS on 14416.
+      </p>
+    </>
+  );
+}
+
+function purgeCountdown(purgeAfter: string): string {
+  const left = new Date(purgeAfter).getTime() - Date.now();
+  if (left <= 0) return 'deleting now';
+  const minutes = Math.round(left / 60000);
+  if (minutes < 60) return `deleted in ${minutes}m`;
+  return `deleted in ${Math.round(minutes / 60)}h`;
+}
+
+function Chat({
+  sessionId,
+  onBack,
+}: {
+  sessionId: string;
+  onBack: () => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const session = useApi(
+    () => api.get<{ session: Session }>(`/api/counselling/sessions/${sessionId}`),
+    [sessionId]
+  );
+  const messages = useApi(
+    () =>
+      api.get<Paged<Message, 'messages'>>(
+        `/api/counselling/sessions/${sessionId}/messages`,
+        { limit: 200 }
+      ),
+    [sessionId]
+  );
+
+  async function send() {
+    const text = draft.trim();
+    if (!text) return;
+    setSending(true);
+    try {
+      await api.post(`/api/counselling/sessions/${sessionId}/messages`, {
+        text,
+        kind: 'text',
+      });
+      setDraft('');
+      await messages.reload();
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function destroy() {
+    if (
+      !confirm(
+        'Delete this session and its whole transcript now? This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+    await api.delete(`/api/counselling/sessions/${sessionId}`);
+    onBack();
+  }
+
+  const status = session.data?.session.status;
+  const ended = status === 'ended';
+
+  return (
+    <>
+      <div className="mb-5 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-[12.5px] text-ink-muted transition hover:text-ink-primary"
+        >
+          ← Sessions
+        </button>
+        <button
+          type="button"
+          onClick={destroy}
+          className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-ink-muted transition hover:text-danger"
+        >
+          <Trash2 className="h-3.5 w-3.5" /> Delete now
+        </button>
+      </div>
+
+      {session.data?.session.purgeAfter && (
+        <div className="mb-4 rounded-md border border-accent/30 bg-accent/10 px-4 py-2.5 text-center">
+          <p className="text-[12px] text-accent">
+            This conversation is {purgeCountdown(session.data.session.purgeAfter)}.
+          </p>
+        </div>
+      )}
+
+      {session.data?.session.meetLink && (
+        <a
+          href={session.data.session.meetLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-primary mb-4 w-full"
+        >
+          Join the video call
+        </a>
+      )}
+
+      <AsyncSection state={messages}>
+        {(data) => (
+          <div className="space-y-2.5">
+            {data.messages.map((message) =>
+              message.sender === 'system' ? (
+                <p
+                  key={message._id}
+                  className="mx-auto max-w-md whitespace-pre-wrap rounded-md bg-bg-card/50 px-4 py-3 text-center text-[12.5px] leading-relaxed text-ink-muted"
+                >
+                  {message.text}
+                </p>
+              ) : (
+                <div
+                  key={message._id}
+                  className={`max-w-[85%] rounded-lg px-4 py-2.5 ${
+                    message.sender === 'member'
+                      ? 'ml-auto bg-gradient-primary text-white'
+                      : 'bg-bg-card text-ink-secondary'
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">
+                    {message.text}
+                  </p>
+                  <p
+                    className={`mt-1 text-[10px] ${
+                      message.sender === 'member'
+                        ? 'text-white/60'
+                        : 'text-ink-muted'
+                    }`}
+                  >
+                    {timeAgo(message.createdAt)}
+                  </p>
+                </div>
+              )
+            )}
+          </div>
+        )}
+      </AsyncSection>
+
+      <div className="mt-5">
+        {ended ? (
+          <p className="rounded-md border border-hairline bg-bg-card/40 px-4 py-3 text-center text-[12.5px] text-ink-muted">
+            This session has ended.
+          </p>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              className="field flex-1"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Write a message…"
+              maxLength={5000}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={send}
+              disabled={sending || !draft.trim()}
+              className="btn-primary !px-4"
+              aria-label="Send"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+const CONCERNS = [
+  'Anxiety or constant worry',
+  'Sadness or low mood',
+  'Relationship trouble',
+  'Family conflict',
+  'Work or study stress',
+  'Loneliness',
+  'Sleep problems',
+  'Anger',
+  'Grief or loss',
+  'Something else',
+];
+
+function Intake({ onDone }: { onDone: () => void }) {
+  const [form, setForm] = useState({
+    name: '',
+    age: '',
+    gender: '',
+    phone: '',
+    concern: CONCERNS[0],
+    language: 'Hinglish',
+    details: '',
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (key: keyof typeof form) => (value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post('/api/counselling/sessions', form);
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open a session.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mb-5">
+      {/* Six questions, not thirty. Somebody reaching for help at 1am abandons
+          a long form, and none of the fields past these change what the
+          counsellor does first. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Your name" value={form.name} onChange={set('name')} />
+        <Field label="Age" value={form.age} onChange={set('age')} />
+        <Field label="Gender" value={form.gender} onChange={set('gender')} />
+        <Field label="Phone" value={form.phone} onChange={set('phone')} />
+
+        <div>
+          <label className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
+            What is it about?
+          </label>
+          <select
+            className="field"
+            value={form.concern}
+            onChange={(event) => set('concern')(event.target.value)}
+          >
+            {CONCERNS.map((concern) => (
+              <option key={concern} value={concern}>
+                {concern}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
+            Language
+          </label>
+          <select
+            className="field"
+            value={form.language}
+            onChange={(event) => set('language')(event.target.value)}
+          >
+            {['Hindi', 'English', 'Hinglish'].map((language) => (
+              <option key={language} value={language}>
+                {language}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <label className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
+          Anything you want to say first (optional)
+        </label>
+        <textarea
+          rows={3}
+          className="field resize-y"
+          value={form.details}
+          maxLength={5000}
+          onChange={(event) => set('details')(event.target.value)}
+        />
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-[12.5px] text-ink-secondary">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={submit}
+        disabled={busy}
+        className="btn-primary mt-4 w-full"
+      >
+        {busy ? 'Opening…' : 'Open a session'}
+      </button>
+    </Card>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = `intake-${label.replace(/\W+/g, '-').toLowerCase()}`;
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-[12px] font-medium text-ink-secondary">
+        {label}
+      </label>
+      <input
+        id={id}
+        className="field"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}

@@ -1,0 +1,24 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# next
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# env — the template carries no secrets and is the documentation for what the
+# site needs, so it stays in the repo. Nothing else does.
+.env
+.env.local
+.env*.local
+!.env.example
+
+# deploy
+.vercel
+
+# macOS finder junk
+.DS_Store

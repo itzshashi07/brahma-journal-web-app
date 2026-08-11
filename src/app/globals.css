@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * The site is dark, always.
+ *
+ * Not a preference toggle that defaults to dark — genuinely one theme. The
+ * Android app has no light mode either, and the whole point of the website is
+ * that it is the same product. A light variant would be a second design to keep
+ * in step with a design that lives in another language in another repository,
+ * which is how the two drift apart.
+ *
+ * `color-scheme: dark` is what stops the browser painting white scrollbars,
+ * white form controls and a white flash before the CSS lands.
+ */
+:root {
+  color-scheme: dark;
+  --font-outfit: 'Outfit', system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-hairline;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Anchored sections land below the sticky header rather than under it. */
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    @apply bg-bg-dark text-ink-primary antialiased;
+    /* Fixed, so the gradient belongs to the window rather than to the document
+       — otherwise a long marketing page stretches it into flat colour. */
+    background-attachment: fixed;
+    background-image:
+      radial-gradient(120% 80% at 50% -10%, rgba(124, 58, 237, 0.18) 0%, transparent 55%),
+      linear-gradient(180deg, #0d0d1a 0%, #1a1a2e 55%, #0f3460 100%);
+  }
+
+  ::selection {
+    @apply bg-primary/40 text-ink-primary;
+  }
+
+  /* Keyboard focus has to be visible on every interactive thing. The default
+     ring is nearly invisible against this background. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-light ring-offset-2 ring-offset-bg-dark;
+  }
+
+  /* Somebody who has asked their operating system to stop moving things means
+     it. The breathing and drifting motifs are decoration; nothing is lost. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /**
+   * The card surface used across both halves of the site.
+   *
+   * Mirrors `GlassCard` in the Flutter app: a translucent fill over the
+   * gradient, a hairline border, and no hard shadow — depth comes from the
+   * border catching light, which is what keeps a dark UI from looking muddy.
+   */
+  .glass {
+    @apply rounded-lg border border-hairline bg-bg-card/60 backdrop-blur-xl;
+  }
+
+  .glass-hover {
+    @apply transition-all duration-300 hover:border-primary/50 hover:bg-bg-card/80 hover:shadow-soft;
+  }
+
+  /* Headline treatment. Kept as a component class because it is applied to
+     roughly forty headings and the gradient values want one home. */
+  .headline {
+    @apply bg-gradient-to-br from-ink-primary via-ink-primary to-primary-light bg-clip-text text-transparent;
+  }
+
+  .gold-text {
+    @apply bg-gradient-gold bg-clip-text text-transparent;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill px-6 py-3 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-gradient-primary text-white shadow-glow hover:brightness-110 active:scale-[0.98];
+  }
+
+  .btn-gold {
+    @apply btn bg-gradient-gold text-bg-dark shadow-glowGold hover:brightness-110 active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply btn border border-hairline bg-bg-card/50 text-ink-primary hover:border-primary/60 hover:bg-bg-card;
+  }
+
+  .field {
+    @apply w-full rounded-md border border-hairline bg-bg-dark/60 px-4 py-3 text-sm text-ink-primary placeholder:text-ink-muted focus:border-primary focus:outline-none;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-pill border border-hairline bg-bg-card/60 px-3 py-1 text-xs font-medium text-ink-secondary;
+  }
+
+  /**
+   * Long-form article body — the Sanctuary reader and the legal pages.
+   *
+   * Written by hand rather than pulled in with @tailwindcss/typography: that
+   * plugin ships a light-theme stylesheet that then has to be overridden colour
+   * by colour, which is more CSS than writing the eight rules that are actually
+   * used here.
+   */
+  .prose-innen {
+    @apply text-[15px] leading-[1.8] text-ink-secondary;
+  }
+  .prose-innen h2 {
+    @apply mb-3 mt-8 text-xl font-semibold text-ink-primary;
+  }
+  .prose-innen h3 {
+    @apply mb-2 mt-6 text-lg font-semibold text-ink-primary;
+  }
+  .prose-innen p {
+    @apply mb-4;
+  }
+  .prose-innen ul {
+    @apply mb-4 list-disc space-y-2 pl-5;
+  }
+  .prose-innen ol {
+    @apply mb-4 list-decimal space-y-2 pl-5;
+  }
+  .prose-innen a {
+    @apply text-primary-light underline underline-offset-2 hover:text-accent-light;
+  }
+  .prose-innen strong {
+    @apply font-semibold text-ink-primary;
+  }
+}
+
+@layer utilities {
+  /* Wide content — tables, code, diagrams — scrolls inside its own box so the
+     page body never scrolls sideways on a phone. */
+  .scroll-x {
+    @apply overflow-x-auto;
+  }
+
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+
+  .container-prose {
+    @apply mx-auto w-full max-w-3xl px-5 sm:px-8;
+  }
+}
