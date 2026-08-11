@@ -17,14 +17,43 @@ export const site = {
   /**
    * The canonical origin.
    *
-   * Every absolute URL in the metadata is built from this, so a deploy to a
-   * preview domain does not publish canonicals and Open Graph URLs pointing at
-   * production — which is how a preview build ends up outranking the real site
-   * for its own brand name.
+   * Every absolute URL in the metadata is built from this — canonicals, Open
+   * Graph, the sitemap, robots.txt — so a deploy to a preview domain must not
+   * publish URLs pointing at production, which is how a preview build ends up
+   * outranking the real site for its own brand name.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * Why the last resort is not a hard-coded domain any more
+   *
+   * It was `https://innenflow.app`, and that domain does not resolve yet. The
+   * site went live on Vercel with every canonical announcing that the real
+   * version of each page lived at a hostname with no DNS behind it — which is
+   * not a cosmetic problem: a canonical is an instruction, and pointing it at a
+   * dead host asks Google to drop the page that is actually working.
+   *
+   * Nothing on the page looks wrong when this happens. It is only visible in
+   * the head, and only to a crawler.
+   *
+   * So the chain is: whatever `NEXT_PUBLIC_SITE_URL` says, then the domain
+   * Vercel knows it is serving this project from, then the custom domain as a
+   * final guess. A deployment therefore describes itself correctly with no
+   * configuration at all, and setting the variable stays the way to override it
+   * once the custom domain is live.
+   *
+   * `NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL` is a system variable Vercel
+   * injects for Next.js projects. It is the *production* alias rather than the
+   * per-deployment URL, so a preview build still canonicalises to production
+   * instead of nominating itself.
    */
-  url:
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
-    'https://innenflow.app',
+  url: (() => {
+    const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
+    if (explicit) return explicit;
+
+    const vercel = process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
+    if (vercel) return `https://${vercel.replace(/\/$/, '')}`;
+
+    return 'https://innenflow.app';
+  })(),
 
   description:
     'InnenFlow is a private journal, meditation timer and anonymous support ' +
