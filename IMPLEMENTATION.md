@@ -90,6 +90,8 @@ src/
     SiteHeader, SiteFooter, Logo, StoreButtons, PhoneMockup,
     GetTheApp.tsx         the "better on your phone" banner and the auth-screen
                           note — one Play Store link, from lib/site.ts
+    ContactForm.tsx       the support page's form → POST /public/contact,
+                          which alerts the operator in the same request
     sections.tsx          the landing-page building blocks
     ThemeToggle.tsx       the switch, and the pre-paint script — see §4
     VerseCard.tsx         one Gita verse, shared by the public and app halves
@@ -437,6 +439,29 @@ Operator alerts take the other branch: every kind of them is answered from the
 one console, so they all point at `/app/admin`. The link used to be drawn for
 `type === 'counselling'` alone, which was one of the five kinds that end up in
 that queue.
+
+### The contact form, and why it does not need an account
+
+`components/ContactForm.tsx` on `/support`, posting to `POST
+/api/public/contact`. The page used to offer a `mailto:` link and a WhatsApp
+group; the link opens a mail client that may not be configured, on a machine
+that may not be theirs, and asks somebody to compose from a blank page. What
+happens instead is that they close the tab.
+
+Unauthenticated on purpose — the people most likely to write in are the ones who
+cannot sign in — and the server writes a ticket and raises an operator alert in
+the same request, so it rings a phone rather than landing in an inbox. Name and
+email are prefilled for somebody who *is* signed in and stay editable, because
+the address a reply should go to is not always the one the account was opened
+with. The hidden `website` field is a honeypot the API accepts and discards.
+
+The operator reads it in the console's **Messages** tab, next to the tickets
+raised from inside the app: they are the same thing — somebody asking for help —
+and two separate screens means the one that gets forgotten is the one from the
+person who cannot sign in. Each row is labelled with where it came from, because
+a website ticket carries an address somebody typed rather than a verified
+account. "Mark handled" closes the ticket, which also takes its alert off the
+queue.
 
 ### The "get the app" nudge, and the one place its link lives
 

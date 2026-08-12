@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Mail, MessageCircle, Trash2, Flag } from 'lucide-react';
 
+import { ContactForm } from '@/components/ContactForm';
 import {
   Breadcrumbs,
   CrisisNote,
@@ -158,6 +159,15 @@ export default function SupportPage() {
               </Link>
             }
           />
+        </div>
+      </section>
+
+      {/* Above the FAQ on purpose. Somebody who has scrolled this far has
+          usually decided the answer is not on the page, and making them find
+          the address at the bottom is where the message gets abandoned. */}
+      <section className="py-6">
+        <div className="container-prose">
+          <ContactForm />
         </div>
       </section>
 

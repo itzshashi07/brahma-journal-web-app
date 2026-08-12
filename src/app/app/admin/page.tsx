@@ -5,6 +5,7 @@ import {
   BookOpen,
   Check,
   HeartHandshake,
+  Mail,
   Megaphone,
   Send,
   ShieldCheck,
@@ -109,7 +110,7 @@ const STATUS_LABEL: Record<string, string> = {
 /** The ones that need somebody, in the order they need them. */
 const NEEDS_ACTION = ['payment_submitted', 'meet_requested'];
 
-type Tab = 'counselling' | 'articles' | 'announce';
+type Tab = 'counselling' | 'articles' | 'messages' | 'announce';
 
 export default function AdminPage() {
   const { isAdmin, loading } = useAuth();
@@ -143,6 +144,9 @@ export default function AdminPage() {
         <TabButton active={tab === 'articles'} onClick={() => setTab('articles')}>
           <BookOpen className="h-3.5 w-3.5" /> Articles
         </TabButton>
+        <TabButton active={tab === 'messages'} onClick={() => setTab('messages')}>
+          <Mail className="h-3.5 w-3.5" /> Messages
+        </TabButton>
         <TabButton active={tab === 'announce'} onClick={() => setTab('announce')}>
           <Megaphone className="h-3.5 w-3.5" /> Announce
         </TabButton>
@@ -150,6 +154,7 @@ export default function AdminPage() {
 
       {tab === 'counselling' && <CounsellingQueue />}
       {tab === 'articles' && <ArticleQueue />}
+      {tab === 'messages' && <MessageQueue />}
       {tab === 'announce' && <Announce />}
     </>
   );
@@ -725,6 +730,166 @@ function ArticleQueue() {
                       {blog.reviewNote}
                     </p>
                   )}
+                </Card>
+              ))}
+            </div>
+          )
+        }
+      </AsyncSection>
+    </>
+  );
+}
+
+// ─────────────────────────── messages ───────────────────────────
+
+type Ticket = {
+  _id: string;
+  firebaseUid?: string;
+  source?: string;
+  userName?: string;
+  userEmail?: string;
+  category?: string;
+  subject?: string;
+  message?: string;
+  status?: 'open' | 'closed';
+  createdAt: string;
+};
+
+/**
+ * What the contact form writes, and the app's support tickets beside it.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Why the two are one list
+ *
+ * They are the same thing — somebody asking for help — and the only difference
+ * is whether they were signed in when they asked. Splitting them into two
+ * screens means the operator has to remember to check both, and the one that
+ * gets forgotten is the one from the person who *cannot sign in*, which is the
+ * more urgent of the two.
+ *
+ * `source` is on every row for the one thing it changes: a ticket from the app
+ * belongs to a verified account, and a ticket from the website carries an
+ * address somebody typed. Replying to the second is replying to a claim.
+ *
+ * Closing is `PATCH /support/tickets/:id`, which also takes the alert off the
+ * operator's queue — see `resolveAdminAlerts` in the API.
+ */
+function MessageQueue() {
+  const [status, setStatus] = useState<'open' | 'closed'>('open');
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const state = useApi(
+    () => api.get<Paged<Ticket, 'tickets'>>('/api/support/tickets', { limit: 50 }),
+    []
+  );
+
+  async function close(id: string) {
+    setBusy(id);
+    try {
+      await api.patch(`/api/support/tickets/${id}`, { status: 'closed' });
+      notificationsChanged();
+      await state.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'That did not go through.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Filtered here rather than by query: the endpoint pages over everything and
+  // an operator switching between "open" and "closed" is looking at the same
+  // fifty rows either way.
+  const visible = (state.data?.tickets ?? []).filter(
+    (ticket) => (ticket.status ?? 'open') === status
+  );
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(['open', 'closed'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setStatus(value)}
+            aria-pressed={status === value}
+            className={`rounded-pill px-3.5 py-1.5 text-[12px] font-medium capitalize transition ${
+              status === value
+                ? 'bg-primary/20 text-primary-light'
+                : 'border border-hairline text-ink-muted hover:text-ink-secondary'
+            }`}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
+
+      <AsyncSection state={state}>
+        {() =>
+          visible.length === 0 ? (
+            <EmptyState
+              title={status === 'open' ? 'Nothing waiting' : 'Nothing closed yet'}
+              body="Messages from the website's contact form and support tickets from inside the app both land here. Closing one takes its alert off your queue."
+            />
+          ) : (
+            <div className="space-y-3">
+              {visible.map((ticket) => (
+                <Card key={ticket._id}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-accent">
+                      {ticket.category || ticket.subject || 'General'}
+                    </span>
+                    <span
+                      className={`rounded-pill px-2 py-0.5 text-[10px] font-semibold ${
+                        ticket.source === 'web-contact'
+                          ? 'bg-accent/15 text-accent'
+                          : 'bg-primary/15 text-primary-light'
+                      }`}
+                    >
+                      {ticket.source === 'web-contact'
+                        ? 'website · not signed in'
+                        : 'from the app'}
+                    </span>
+                    <span className="ml-auto text-[11px] text-ink-muted">
+                      {timeAgo(ticket.createdAt)}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-[14px] font-semibold text-ink-primary">
+                    {ticket.userName || 'Someone'}
+                    {ticket.userEmail && (
+                      <span className="ml-2 break-all text-[12.5px] font-normal text-ink-secondary">
+                        {ticket.userEmail}
+                      </span>
+                    )}
+                  </p>
+
+                  <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-secondary">
+                    {ticket.message}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {ticket.userEmail && (
+                      <a
+                        href={`mailto:${ticket.userEmail}?subject=${encodeURIComponent(
+                          `Re: ${ticket.category || 'your message'} — InnenFlow`
+                        )}`}
+                        className="btn-primary !py-2 text-[12.5px]"
+                      >
+                        <Mail className="h-3.5 w-3.5" /> Reply by email
+                      </a>
+                    )}
+                    {(ticket.status ?? 'open') === 'open' && (
+                      <button
+                        type="button"
+                        onClick={() => close(ticket._id)}
+                        disabled={busy === ticket._id}
+                        className="btn-ghost !py-2 text-[12.5px]"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        {busy === ticket._id ? 'Closing…' : 'Mark handled'}
+                      </button>
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
