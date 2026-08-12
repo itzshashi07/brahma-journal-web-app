@@ -427,6 +427,21 @@ The same data renders in three places: `/app/wisdom` (filterable, private),
 by situation rather than by chapter, because nobody at 2am searches for
 "Chapter 2, Verse 47" — they search for what is happening to them.
 
+### The thought of the day rotates here too, and an override lasts one day
+
+`src/content/thoughts.ts` is the `_thoughts` list from the app's
+`thoughts_365.dart`, converted the same way and for the same reason as the Gita:
+both surfaces have to land on the *same* line for a given date, or a member who
+reads the dashboard at work and the app at night is given two different thoughts.
+
+The dashboard card used to render only `metadata/thought_of_the_day` — an
+operator's override with no expiry — so it was blank on every day nobody had set
+one, and showed a line from months ago on all the rest. The override now carries
+a `date` stamp written by the app's picker, and either client honours it only
+while that stamp is the reader's own local today. Everything else is
+`thoughtForDay(new Date())`, so the card is never empty and rolls over by
+itself at midnight.
+
 ### Guides and comparisons have rules
 
 `guides.ts` holds pages that answer the whole question with nothing held back

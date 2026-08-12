@@ -14,6 +14,7 @@ import {
 import { Card, PageHeader, timeAgo } from '@/components/app/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { dateKey, thoughtForDay } from '@/content/thoughts';
 import { greetingFor, greetingSubtitleFor } from '@/lib/entries';
 
 /**
@@ -38,6 +39,21 @@ import { greetingFor, greetingSubtitleFor } from '@/lib/entries';
  */
 export default function DashboardPage() {
   const { profile, refreshProfile } = useAuth();
+
+  /**
+   * The thought of the day: the line for today's date, unless an operator has
+   * published one *for today*.
+   *
+   * The override used to be the only source, and it had no expiry — so the
+   * card showed whatever was last set, for months, and was blank until
+   * somebody set something. It carries a `date` stamp now and is honoured only
+   * while that stamp is the reader's own today; the 366-line library underneath
+   * is what the banner returns to at midnight, on its own.
+   *
+   * Null until mounted, for the same reason as `now` below: the day depends on
+   * the reader's clock, and the server that pre-renders this page is not in
+   * their timezone.
+   */
   const [thought, setThought] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,12 +66,23 @@ export default function DashboardPage() {
         // The dashboard still renders with whatever the profile already held.
       });
 
+    // The rotating line first, so the card is never empty and never waits on
+    // the network to say something. An operator's override replaces it only if
+    // it was published for today — see the note above `thought`.
+    const today = new Date();
+    setThought(thoughtForDay(today));
+
     api
-      .get<{ value?: { text?: string } }>(
+      .get<{ value?: { text?: string; date?: string } }>(
         '/api/support/metadata/thought_of_the_day'
       )
-      .then((body) => setThought(body?.value?.text ?? null))
-      .catch(() => setThought(null));
+      .then((body) => {
+        const { text, date } = body?.value ?? {};
+        if (text && text.trim() && date === dateKey(today)) setThought(text);
+      })
+      .catch(() => {
+        // The rotating line is already on screen. Nothing to do.
+      });
     // Deliberately once per mount. Re-running on every profile change would
     // loop, because this updates the profile.
     // eslint-disable-next-line react-hooks/exhaustive-deps
