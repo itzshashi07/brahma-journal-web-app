@@ -9,8 +9,10 @@ import {
   MessagesSquare,
   NotebookPen,
   Sparkles,
+  Target,
 } from 'lucide-react';
 
+import { GetTheAppBanner } from '@/components/GetTheApp';
 import { Card, PageHeader, timeAgo } from '@/components/app/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -113,6 +115,11 @@ export default function DashboardPage() {
         }
       />
 
+      {/* Under the greeting and above everything they came to do: the first
+          thing after signing in, and the last thing that gets in the way. It
+          remembers being dismissed for a month — see components/GetTheApp. */}
+      <GetTheAppBanner name={profile?.name} />
+
       {thought && (
         <Card className="mb-6 border-primary/25 bg-primary/10">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">
@@ -201,6 +208,22 @@ export default function DashboardPage() {
           <p className="mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
             Streaks and minutes, recomputed from real records rather than
             reported by the app.
+          </p>
+        </Link>
+
+        {/* The routine above answers "did you turn up". This is the other
+            question — whether the thing you are building is getting finished —
+            and it is the one people open a laptop to check. */}
+        <Link href="/app/deep-work" className="glass glass-hover block p-5">
+          <span className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary-light">
+            <Target className="h-4 w-4" />
+          </span>
+          <h3 className="text-[15px] font-semibold text-ink-primary">
+            What you are building
+          </h3>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
+            Milestones, their steps, and an honest verdict on whether the pace
+            gets you there. One track per part of your life.
           </p>
         </Link>
       </div>

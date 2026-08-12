@@ -18,6 +18,7 @@ import {
   ScrollText,
   ShieldCheck,
   Sparkles,
+  Target,
   Trophy,
   User,
   X,
@@ -54,6 +55,9 @@ import { NotificationBell } from './NotificationBell';
 const nav = [
   { href: '/app/dashboard', label: 'Today', icon: Flame },
   { href: '/app/journal', label: 'Journal', icon: NotebookPen },
+  // Directly under the journal, because the two are one loop: the journal says
+  // you turned up, this says whether the thing is getting finished.
+  { href: '/app/deep-work', label: 'Deep work', icon: Target },
   { href: '/app/meditation', label: 'Meditate', icon: Brain },
   { href: '/app/affirmations', label: 'Affirmations', icon: Sparkles },
   { href: '/app/wisdom', label: 'Wisdom', icon: ScrollText },

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
+import { GetTheAppNote } from '@/components/GetTheApp';
 import { Logo } from '@/components/Logo';
 import { useAuth } from '@/lib/auth-context';
 import { site } from '@/lib/site';
@@ -368,6 +369,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
           )}
         </div>
       </div>
+
+      {/* Under the form, not over it: somebody typing a password is doing a
+          thing, and a card that competes with it costs the sign-in to win an
+          install. Not on the reset screen — a person who cannot get in is the
+          last person to sell an app to. */}
+      {mode !== 'reset' && <GetTheAppNote />}
 
       {mode === 'signup' && (
         <p className="mt-5 text-center text-[11.5px] leading-relaxed text-ink-muted">

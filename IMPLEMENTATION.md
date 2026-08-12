@@ -78,8 +78,8 @@ src/
       download, about, support, privacy, terms
     app/                  everything behind sign-in
       layout.tsx          noindex + AppShell
-      dashboard, journal, meditation, affirmations, wisdom, thoughts,
-      community, blogs/[id], library, counselling, notifications,
+      dashboard, journal, deep-work, meditation, affirmations, wisdom,
+      thoughts, community, blogs/[id], library, counselling, notifications,
       profile, analytics, games
       admin/              the operator console — counselling queue,
                           article review, announcements. Drawn from the
@@ -88,6 +88,8 @@ src/
     sitemap.ts  robots.ts  manifest.ts  og/route.tsx
   components/
     SiteHeader, SiteFooter, Logo, StoreButtons, PhoneMockup,
+    GetTheApp.tsx         the "better on your phone" banner and the auth-screen
+                          note — one Play Store link, from lib/site.ts
     sections.tsx          the landing-page building blocks
     ThemeToggle.tsx       the switch, and the pre-paint script — see §4
     VerseCard.tsx         one Gita verse, shared by the public and app halves
@@ -393,6 +395,67 @@ id, a weekly target and the member's own extra checklist items, all of which
 The ids in that file and in `content/journal.ts` are the wire format shared with
 Android. Change a label freely; change an id and a year of history stops being
 readable.
+
+### Deep work, and why the arithmetic is in `lib/milestones.ts`
+
+`/app/deep-work` is the app's deep-work screen, against the same
+`/api/practice/milestones` records. Everything else the web app carries is
+something you *do* in a sitting; this is the one screen you open to *check* —
+what am I building, what is left, am I going to get there — which is a question
+people ask at a desk far more often than on a phone.
+
+The numbers live in the library and not in the page, for the same reason
+`craft-stats.ts` exists: a verdict reading "on course" here and "behind" on the
+phone would make both unbelievable. Progress, days left, the fortnight of dots,
+the current run and the verdict sentence are ports of the Dart, word for word
+where they are words. Nothing is computed server-side, because the pace depends
+on the member's own calendar and the API runs in UTC.
+
+Two things differ from the app on purpose. A milestone opens in a **dialog over
+the list** rather than as a pushed screen: on a laptop the other track you are
+also behind on is context you need while deciding what to do about this one.
+And **the craft is chosen per milestone** — the chooser is in the compose dialog
+with the profile's craft preselected — because people are not one thing: an
+engineer who also sings has an engineering milestone and a singing one, and the
+list groups by craft as soon as more than one is in play.
+
+Ticking "did deep work today" writes `craftDone` on today's journal entry, which
+is the same record the app writes and the same one the fortnight is drawn from.
+Two definitions of a working day is how two screens end up disagreeing about the
+same week.
+
+### A notification that does not open anything is a notification about nothing
+
+The broadcast cards on `/app/notifications` were plain text, and the `route` the
+API writes on every notification was ignored. That route is in the *app's*
+vocabulary — `/blogs/<id>`, `/gita`, `/products` — while this site mounts the
+same screens under `/app/…` and renames two of them. `lib/notification-routes.ts`
+is the translation; anything with no page here returns null and the card stays
+plain rather than linking into a 404.
+
+Operator alerts take the other branch: every kind of them is answered from the
+one console, so they all point at `/app/admin`. The link used to be drawn for
+`type === 'counselling'` alone, which was one of the five kinds that end up in
+that queue.
+
+### The "get the app" nudge, and the one place its link lives
+
+`components/GetTheApp.tsx`: a dismissible banner under the dashboard greeting,
+and a quieter note under the sign-in and sign-up forms. It names the three
+things a browser genuinely cannot do — reach you while it is closed, work with
+no signal, sit one tap from the home screen — rather than asserting that the app
+is nicer.
+
+The dismissal is a `localStorage` timestamp with a thirty-day snooze, not a
+cookie and not a profile field: it is a fact about *this browser*, and somebody
+who dismisses it on a laptop has said nothing about their phone. The banner
+renders nothing until that value has been read, so it never flashes for somebody
+who already said no.
+
+The link is `site.store.android.url`, built from the package id in `lib/site.ts`.
+Until the listing is published that URL resolves to Play's "item not found" page
+— it is deliberately the same constant the download page and the JSON-LD already
+use, so publishing means changing one value in one file.
 
 ---
 

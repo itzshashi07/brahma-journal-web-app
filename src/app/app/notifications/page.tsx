@@ -14,6 +14,7 @@ import {
 } from '@/components/app/ui';
 import { api, type Paged } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { webRouteFor } from '@/lib/notification-routes';
 import { notificationsChanged } from '@/lib/notify-bus';
 
 /**
@@ -76,6 +77,7 @@ type AdminAlert = {
   title: string;
   body?: string;
   type?: string;
+  route?: string | null;
   subjectEmail?: string;
   subjectId?: string | null;
   createdAt: string;
@@ -233,33 +235,51 @@ function BroadcastFeed() {
             />
           ) : (
             <div className="space-y-3">
-              {visible.map((item) => (
-                <Card key={item._id} className="!p-4">
-                  <div className="flex gap-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary-light">
-                      <Megaphone className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-ink-primary">
-                        {item.title}
-                      </p>
-                      {item.body && (
-                        <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
-                          {item.body}
-                        </p>
-                      )}
-                      <p className="mt-1.5 text-[11px] text-ink-muted">
-                        {timeAgo(item.createdAt)}
-                      </p>
-                    </div>
+              {visible.map((item) => {
+                // "📖 New article" that does not open the article is a
+                // notification about nothing. The route on it is written in the
+                // app's vocabulary, so it is translated rather than followed —
+                // see lib/notification-routes.ts.
+                const href = webRouteFor(item.route);
 
-                    <DismissButton
-                      label={item.title}
-                      onClick={() => dismiss(item._id)}
-                    />
-                  </div>
-                </Card>
-              ))}
+                return (
+                  <Card key={item._id} className="!p-4">
+                    <div className="flex gap-3">
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary-light">
+                        <Megaphone className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-semibold text-ink-primary">
+                          {item.title}
+                        </p>
+                        {item.body && (
+                          <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
+                            {item.body}
+                          </p>
+                        )}
+                        <div className="mt-1.5 flex items-center gap-3">
+                          <p className="text-[11px] text-ink-muted">
+                            {timeAgo(item.createdAt)}
+                          </p>
+                          {href && (
+                            <Link
+                              href={href}
+                              className="text-[11.5px] font-semibold text-primary-light hover:underline"
+                            >
+                              Open →
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+
+                      <DismissButton
+                        label={item.title}
+                        onClick={() => dismiss(item._id)}
+                      />
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )
         }
@@ -444,12 +464,18 @@ function AdminFeed() {
                         <span className="text-[11px] text-ink-muted">
                           {timeAgo(item.createdAt)}
                         </span>
-                        {item.type === 'counselling' && (
+                        {/* Every kind of alert is answered from the console,
+                            not only counselling ones — an article waiting for
+                            review and a report both live there too, and the
+                            link used to appear for exactly one of the five. */}
+                        {webRouteFor(item.route, { isAdminAlert: true }) && (
                           <Link
-                            href="/app/admin"
+                            href={
+                              webRouteFor(item.route, { isAdminAlert: true })!
+                            }
                             className="text-[11.5px] text-primary-light underline underline-offset-2"
                           >
-                            Open the counselling queue
+                            Open the operator console
                           </Link>
                         )}
                       </div>
