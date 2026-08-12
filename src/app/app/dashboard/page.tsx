@@ -14,6 +14,7 @@ import {
 import { Card, PageHeader, timeAgo } from '@/components/app/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { greetingFor, greetingSubtitleFor } from '@/lib/entries';
 
 /**
  * The dashboard.
@@ -60,15 +61,29 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 5 ? 'Still up' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  /**
+   * The greeting, computed after mount rather than during the render.
+   *
+   * It reads the clock, and the clock on the server that pre-renders this page
+   * is not in the member's timezone — so rendering it directly produces a
+   * hydration mismatch and, worse, a flash of somebody in Delhi being told good
+   * morning at 11pm. Null until mounted; the header simply omits the greeting
+   * for that first frame.
+   */
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => setNow(new Date()), []);
+
+  const name = profile?.name ? `, ${profile.name}` : '';
 
   return (
     <>
       <PageHeader
-        title={`${greeting}${profile?.name ? `, ${profile.name}` : ''}`}
-        subtitle="Five to seven minutes is the whole routine. Start anywhere."
+        title={now ? `${greetingFor(now)}${name}` : `Hello${name}`}
+        subtitle={
+          now
+            ? greetingSubtitleFor(now)
+            : 'Five to seven minutes is the whole routine. Start anywhere.'
+        }
       />
 
       {thought && (

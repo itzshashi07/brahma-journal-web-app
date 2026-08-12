@@ -35,6 +35,22 @@ import { Mic, Square } from 'lucide-react';
  * on so there is something on screen while they speak; interim text is shown
  * greyed and is replaced, never appended, or every hesitation ends up in the
  * entry twice.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Two things that made this look broken when it was not
+ *
+ * **The header.** `Permissions-Policy: microphone=()` in `next.config.mjs`
+ * denied the microphone to this origin, not just to embeds. Chrome enforces
+ * that before it draws a permission prompt, so `start()` succeeded, `onend`
+ * fired a moment later, and nothing was ever transcribed — with no error a
+ * member could see. That is fixed at the header; see the note there.
+ *
+ * **Chrome ends the session anyway.** `continuous = true` is not a promise.
+ * Chrome stops recognition after a stretch of silence regardless, which on a
+ * journal — where somebody stares at the ceiling for ten seconds mid-sentence —
+ * means the mic switches itself off halfway through a thought. So `onend`
+ * restarts it while the member still wants to be listened to, and only a
+ * deliberate Stop, an error, or unmounting clears that intent.
  */
 
 // The API is not in TypeScript's DOM library, so the shape used here is
@@ -79,8 +95,17 @@ function recogniser(): SpeechRecognitionLike | null {
   }
 }
 
+/**
+ * Whether to offer the button at all.
+ *
+ * `isSecureContext` is part of the test on purpose: the API is present on an
+ * insecure origin and refuses to run, so without this the button appears on a
+ * plain-HTTP preview deployment and does nothing when pressed. Localhost counts
+ * as secure, so development is unaffected.
+ */
 export function dictationSupported(): boolean {
   if (typeof window === 'undefined') return false;
+  if (!window.isSecureContext) return false;
   return (
     'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
   );
@@ -91,6 +116,16 @@ export const DICTATION_LANGS = [
   { value: 'en-IN', label: 'English' },
   { value: 'hi-IN', label: 'हिंदी' },
 ] as const;
+
+/**
+ * How many silent sessions to sit through before admitting defeat.
+ *
+ * Six is roughly a minute of a browser ending sessions on ~8s of silence, which
+ * is a long enough think for anybody staring at "what pulled at you today" and
+ * short enough that a genuinely broken microphone says so rather than pulsing
+ * indefinitely.
+ */
+const MAX_EMPTY_RESTARTS = 6;
 
 export function DictationButton({
   lang = 'en-IN',
@@ -111,6 +146,30 @@ export function DictationButton({
   const [supported, setSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const engine = useRef<SpeechRecognitionLike | null>(null);
+
+  /**
+   * Whether the member still wants to be listened to.
+   *
+   * Separate from `listening`, which is whether the engine happens to be
+   * running right now. Chrome ends a session on its own after a pause; this is
+   * what tells `onend` the difference between "Chrome gave up" — restart — and
+   * "they pressed Stop" — do not.
+   */
+  const wanted = useRef(false);
+
+  /** Read by `open`, so a restart reuses the language without a re-render. */
+  const langRef = useRef(lang);
+  langRef.current = lang;
+
+  /**
+   * Consecutive restarts that produced nothing.
+   *
+   * The restart in `onend` is the right behaviour when a session ended because
+   * somebody paused. It would be a spin loop if a browser ever ended sessions
+   * instantly without reporting an error — an environment we cannot enumerate,
+   * so it is bounded rather than trusted. Any transcript at all resets it.
+   */
+  const emptyRestarts = useRef(0);
 
   /**
    * The callbacks, through refs.
@@ -134,6 +193,7 @@ export function DictationButton({
   useEffect(() => setSupported(dictationSupported()), []);
 
   const stop = useCallback(() => {
+    wanted.current = false;
     engine.current?.stop();
     engine.current = null;
     setListening(false);
@@ -142,22 +202,37 @@ export function DictationButton({
 
   // A recogniser left running when the composer closes keeps the microphone
   // indicator lit in the tab, which is alarming and fair enough.
-  useEffect(() => () => engine.current?.abort(), []);
+  useEffect(
+    () => () => {
+      wanted.current = false;
+      engine.current?.abort();
+    },
+    []
+  );
 
-  const start = useCallback(() => {
-    setError(null);
-
+  /**
+   * Opens a recognition session.
+   *
+   * Called both by the button and by `onend` when Chrome has ended a session on
+   * its own. Each call builds a fresh recogniser: a `SpeechRecognition` that has
+   * ended cannot be restarted reliably in Chrome, and reusing one is how the
+   * second half of a dictation goes silently missing.
+   */
+  const open = useCallback(() => {
     const engine_ = recogniser();
     if (!engine_) {
       setSupported(false);
+      wanted.current = false;
       return;
     }
 
-    engine_.lang = lang;
+    engine_.lang = langRef.current;
     engine_.continuous = true;
     engine_.interimResults = true;
 
     engine_.onresult = (event) => {
+      emptyRestarts.current = 0;
+
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
@@ -169,23 +244,49 @@ export function DictationButton({
     };
 
     engine_.onerror = (event) => {
-      // `no-speech` fires on an ordinary pause and is not worth a message; a
-      // refused permission is, because nothing will happen until it is granted
-      // and the browser does not always make that obvious.
+      // `no-speech` fires on an ordinary pause and is not worth a message — and
+      // must not stop the session either, since a pause mid-thought is the
+      // normal way somebody dictates a journal entry. A refused permission is
+      // worth a message, because nothing will happen until it is granted and the
+      // browser does not always make that obvious.
+      if (event.error === 'no-speech') return;
+
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        setError('The microphone is blocked for this site. Allow it in the address bar.');
-      } else if (event.error && event.error !== 'no-speech' && event.error !== 'aborted') {
+        setError(
+          'The microphone is blocked for this site. Allow it from the icon in the address bar, then try again.'
+        );
+      } else if (event.error && event.error !== 'aborted') {
         setError('Dictation stopped. Try again.');
       }
+
+      wanted.current = false;
       setListening(false);
       engine.current = null;
       interimRef.current?.('');
     };
 
     engine_.onend = () => {
-      setListening(false);
       engine.current = null;
       interimRef.current?.('');
+
+      // Chrome ends a session after a stretch of silence whatever `continuous`
+      // says. While the member has not pressed Stop, that is not the end of the
+      // dictation — it is a gap to be closed, and closing it is the difference
+      // between speaking an entry and tapping the mic every eight seconds.
+      if (wanted.current) {
+        emptyRestarts.current += 1;
+        if (emptyRestarts.current <= MAX_EMPTY_RESTARTS) {
+          open();
+          return;
+        }
+        // Nothing has been heard across several sessions. Something is wrong
+        // that restarting will not fix — a muted device, a mic the OS has given
+        // to another app — and silently retrying forever is worse than saying so.
+        wanted.current = false;
+        setError('Nothing is coming through. Check the microphone and try again.');
+      }
+
+      setListening(false);
     };
 
     try {
@@ -197,7 +298,17 @@ export function DictationButton({
       // "already listening" is the truthful reading.
       setListening(true);
     }
-  }, [lang]);
+  }, []);
+
+  const start = useCallback(() => {
+    setError(null);
+    // A fresh press is a fresh budget. Without this, somebody who gave up once
+    // because the mic was muted gets one session on the retry and then the same
+    // "nothing is coming through" straight away.
+    emptyRestarts.current = 0;
+    wanted.current = true;
+    open();
+  }, [open]);
 
   if (!supported) return null;
 

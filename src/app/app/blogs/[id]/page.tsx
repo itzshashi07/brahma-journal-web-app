@@ -12,11 +12,14 @@ import {
   timeAgo,
   useApi,
 } from '@/components/app/ui';
+import { ReportDialog, type ReportTarget } from '@/components/app/ReportDialog';
 import { api, type Paged } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 type Blog = {
   _id: string;
+  /** Author's uid. Empty on articles that predate member authorship. */
+  uid?: string;
   title: string;
   titleHinglish?: string;
   content: string;
@@ -57,6 +60,18 @@ export default function BlogDetailPage() {
   const [hinglish, setHinglish] = useState(false);
   const [comment, setComment] = useState('');
   const [sending, setSending] = useState(false);
+
+  /**
+   * What the flag opens, rather than what it posts.
+   *
+   * The button used to post immediately, with `contentKind: 'article'` — a fifth
+   * kind neither the app nor the moderation inbox has ever known about, so a
+   * report filed from this page arrived in the queue as an unrecognised row that
+   * the inbox could not open. The app files articles as `'blog'` and comments as
+   * `'comment'`; two clients using different words for the same object is how a
+   * moderation queue quietly stops being one queue.
+   */
+  const [reporting, setReporting] = useState<ReportTarget | null>(null);
 
   const article = useApi(
     () => api.get<{ blog: Blog }>(`/api/blogs/${id}`),
@@ -102,18 +117,6 @@ export default function BlogDetailPage() {
     }
   }
 
-  async function report() {
-    try {
-      await api.post('/api/support/reports', {
-        contentKind: 'article',
-        contentId: id,
-        reason: 'Reported from the reader',
-      });
-      alert('Reported. A person will look at it.');
-    } catch {
-      alert('Could not send that report.');
-    }
-  }
 
   return (
     <>
@@ -191,7 +194,17 @@ export default function BlogDetailPage() {
 
                   <button
                     type="button"
-                    onClick={report}
+                    onClick={() =>
+                      setReporting({
+                        contentKind: 'blog',
+                        contentId: id,
+                        // Empty on articles that predate member authorship —
+                        // sent as null rather than as '', so the queue does not
+                        // show a report attributed to a uid nobody has.
+                        reportedUid: blog.uid || null,
+                        excerpt: `${blog.title}\n\n${body}`,
+                      })
+                    }
                     className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-ink-muted transition hover:text-accent"
                   >
                     <Flag className="h-3.5 w-3.5" /> Report
@@ -240,15 +253,42 @@ export default function BlogDetailPage() {
                     <div className="space-y-3">
                       {list.comments.map((item) => (
                         <Card key={item._id} className="!p-4">
-                          <p className="text-[12px] font-semibold text-ink-secondary">
-                            {item.authorName || 'A member'}
-                            <span className="ml-2 font-normal text-ink-muted">
-                              {timeAgo(item.createdAt)}
-                            </span>
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-secondary">
-                            {item.content}
-                          </p>
+                          <div className="flex items-start gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] font-semibold text-ink-secondary">
+                                {item.authorName || 'A member'}
+                                <span className="ml-2 font-normal text-ink-muted">
+                                  {timeAgo(item.createdAt)}
+                                </span>
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-secondary">
+                                {item.content}
+                              </p>
+                            </div>
+
+                            {/* Comments carry their author's uid, so a report on
+                                one can name who wrote it — which is what makes
+                                blocking them possible later. */}
+                            {item.uid !== user?.uid && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setReporting({
+                                    contentKind: 'comment',
+                                    contentId: item._id,
+                                    parentId: id,
+                                    reportedUid: item.uid || null,
+                                    excerpt: item.content,
+                                  })
+                                }
+                                className="shrink-0 text-ink-muted transition hover:text-accent"
+                                title="Report this comment"
+                                aria-label="Report this comment"
+                              >
+                                <Flag className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
                         </Card>
                       ))}
                     </div>
@@ -259,6 +299,8 @@ export default function BlogDetailPage() {
           );
         }}
       </AsyncSection>
+
+      <ReportDialog target={reporting} onClose={() => setReporting(null)} />
     </>
   );
 }

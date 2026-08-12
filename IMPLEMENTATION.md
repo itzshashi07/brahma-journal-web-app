@@ -94,21 +94,32 @@ src/
     LegalDoc, AuthForm, Icon
     app/
       AppShell            auth gate + navigation + the phone drawer
-      ui.tsx              useApi, AsyncSection, Card, EmptyState, …
+      ui.tsx              useApi, AsyncSection, Card, Modal, ChipGroup, …
       NotificationBell
       Avatar.tsx          the built avatar, in SVG — the app's `m:` encoding
       AvatarPicker.tsx    presets first, seven option rows second
       Dictation.tsx       Web Speech, for the journal
+      DailyPrompts.tsx    the three things that interrupt, sequenced — §4
+      WelcomeCelebration  once per sign-in, new vs returning
+      DailyCheckIn.tsx    the once-a-day conversation
+      JournalNudge.tsx    one random question about a gap in today
+      ReportDialog.tsx    the reason sheet behind every flag
   content/                the words. Data, not JSX — see §5
     features.ts  use-cases.ts  legal.ts
     gita.ts               generated from the app's gita_verses.dart
     guides.ts  comparisons.ts
+    games.ts              the catalogue, mirroring game_catalog.dart
+    journal.ts            chip options, moods, prompts — journal_options.dart
+    professions.ts        the fourteen crafts — professions.dart
+    checkin.ts            the check-in questions — checkin_questions.dart
   lib/
     site.ts               name, URLs, store links — one source
     firebase.ts           identity only, lazily initialised
     api.ts                the client. A port of api_service.dart
     public-api.ts         server-side reader for published articles
     auth-context.tsx      who is signed in
+    entries.ts            the journal entry type, local-day maths, greetings
+    craft-stats.ts        consistency, streaks and mood lift — craft_stats.dart
     seo.ts                metadata + JSON-LD builders
     validate.ts           email, phone, age and the gender list — one
                           definition, used by every form
@@ -280,6 +291,108 @@ moment. Built on the Web Speech API, so it is absent on Firefox rather than
 present and broken, and it offers English and Hindi because a recogniser set to
 `en-IN` transcribes Hindi as nonsense rather than failing. Interim results are
 shown greyed under the field and never appended — they are revised as you speak.
+
+**It was dead for a long time, and the cause was not in this file.**
+`next.config.mjs` sent `Permissions-Policy: microphone=()`, which does not mean
+"ask before using the microphone" — it means "this document may never use the
+microphone, including from its own origin". Chrome enforces that *before* it
+draws a permission prompt, so `start()` returned cleanly, `onend` fired a moment
+later, and no transcript and no dialog ever appeared. Every mic button on the
+site lit up, pulsed, and stopped. It is `microphone=(self)` now: still denied to
+every embed, which is the part worth having.
+
+Two more things make it usable in practice. Chrome ends a session after a
+stretch of silence whatever `continuous` says, so `onend` reopens a *fresh*
+recogniser while the member has not pressed Stop — a recogniser that has ended
+cannot be reliably restarted, and reusing one is how the second half of a
+dictation goes missing. That restart is bounded (`MAX_EMPTY_RESTARTS`) so a muted
+device says so rather than pulsing forever. And `no-speech` no longer stops
+anything: pausing mid-thought is how people dictate a journal entry.
+
+### The three things that interrupt, and the order they do it in
+
+`components/app/DailyPrompts.tsx`, a port of `_loadData` in
+`dashboard_screen.dart`. Three things can want the screen when somebody arrives,
+and letting them race produces the worst version of all three — so:
+
+1. **the welcome** (`WelcomeCelebration`), which belongs to the sign-in that just
+   happened and reads as an afterthought if anything gets there first. Gated on
+   `consumeJustSignedIn()` in `auth-context`, which is an *event* rather than a
+   date: reloading does not re-greet, and a member of six months is not told
+   "welcome to the family". The flag lives in `sessionStorage` because sign-in
+   happens on `/login` and the greeting is shown on `/app/dashboard` — a full
+   navigation in between, which throws away anything held in React;
+2. **the check-in** (`DailyCheckIn`), once a day, and only when today has not
+   been written. It merges into **today's** entry rather than creating a second
+   one, so it feeds the same streak and insights as the full journal;
+3. **the nudge** (`JournalNudge`), only when the check-in did not run. One small
+   question about something today's entry is still missing.
+
+The nudge's limits are the feature: at most three a day, forty minutes apart,
+never within twenty minutes of the check-in, and past all that only a 55% chance
+— except the day's *first*, which is certain, because a purely random prompt
+means somebody who opens the site once a day has a 45% chance of never being
+asked anything. A member whose entry is already complete is never interrupted at
+all, since only gaps are asked about.
+
+All of it is confined to `/app/dashboard`. The shell wraps every signed-in
+screen, and mounting this unconditionally would put a bottom sheet over a
+counselling chat.
+
+### The journal writes one entry per day, not one per save
+
+`POST` creates; the composer `PATCH`es when today already has an entry. It used
+to post every time, so a member who wrote in the morning and added a line at
+night had two entries for one day — which double-counts `totalJournalEntries`
+and splits the day across two cells of every chart drawn from this data. The
+check-in and the nudge follow the same rule, and it is why `lib/entries.ts`
+exports `localDayKey`: "today" has to be resolved in the member's timezone, or
+anything written after midnight in India is filed as yesterday.
+
+### The flag opens a form, and the reason on it is load-bearing
+
+`components/app/ReportDialog.tsx`. Both flags on this site used to post
+immediately with a hard-coded reason — `'Reported from the board'` on a
+reflection, `'Reported from the reader'` on an article — and say so in a
+`window.alert`. Three things were wrong, and the third is the one that mattered.
+
+The report was unactionable: "reported from the board" restates where the button
+was. It fired on one click, so a mis-tap on a phone became a report. And
+`routes/support.js` raises an **urgent** alert — pushed to the operator with
+"Someone may be in danger" on the lock screen — when and only when the reason
+mentions self-harm. With a hard-coded string that path could never fire from the
+web, so a member who spotted somebody in trouble here had no way to say so while
+the same member on Android had it two taps away. Self-harm is the first option
+in the dialog for that reason.
+
+The article flag also sent `contentKind: 'article'` — a fifth kind neither the
+app nor the moderation inbox has ever known about, so the report arrived as a row
+the queue could not open. The kinds are `thought | reply | blog | comment`, and
+replies and comments can now be reported too, which the web previously could not
+do at all.
+
+Hiding a reflection is local, in `localStorage`, and that is deliberate: a
+server-side record of which anonymous posts you cared enough about to suppress is
+exactly the trail this board exists to avoid leaving. Blocking is server-side,
+because it applies to named authors and has to survive a new device.
+
+### The craft track, and why `profession` is an id
+
+`content/professions.ts`, ported from `professions.dart`. The journal already
+proves you turned up; it does not prove you turned up *for the thing you care
+about*. A singer who journals daily for a month and never sings has a perfect
+streak and nothing to show for it.
+
+`profession` was a free-text box on this site — "Student, engineer, between
+things…" — and an **id** everywhere else. The app matches on the id to pick a
+checklist, so somebody who typed "singer" here got no checklist, no craft chips
+in the journal, and an empty consistency chart. The profile screen now writes an
+id, a weekly target and the member's own extra checklist items, all of which
+`PATCH /profile/me` has accepted since the beginning.
+
+The ids in that file and in `content/journal.ts` are the wire format shared with
+Android. Change a label freely; change an id and a year of history stops being
+readable.
 
 ---
 
@@ -465,14 +578,18 @@ Things that must move together:
   line.
 - **No analytics.** Nothing is measured, which also means nothing is collected.
   If this changes, the privacy policy changes in the same commit.
-- **Focus is simplified** relative to the Flutter app — one reaction game against
-  the app's fuller set. The API is the same; the screen is smaller. Meditation is
-  no longer in this list: six breathing patterns, a guide ring, bells and the
-  sitting streak are here now, and the one-minute option is deliberate.
-- **Still missing against the app:** the daily check-in sheet and the in-app
-  support ticket form. Account deletion is on `/app/profile`; the standalone
-  `docs/delete-account.html` in the workspace repo is still the URL Google Play
-  points at and should become a route here.
+- **Six of the fifteen Focus games are playable in the browser.** The rest are
+  listed with the member's best, because a score set on the phone is their score.
+  Rounds played here now write a `FocusSession` as well as banking seconds into
+  the `_total` row — previously only the latter, so Insights could show a Game
+  Zone total with no per-game breakdown under it for anybody who plays on the
+  web.
+- **Still missing against the app:** the in-app support ticket form, and the
+  craft setup's per-habit emoji (custom items are stored as `{id, label}`, which
+  is all the API's `customHabits` schema carries, and render with a default
+  tick). The daily check-in is no longer in this list. Account deletion is on
+  `/app/profile`; the standalone `docs/delete-account.html` in the workspace repo
+  is still the URL Google Play points at and should become a route here.
 - **The operator console covers three jobs, not every job.** Counselling
   approvals, article review and announcements. The library catalogue
   (`PUT /library/…`), support tickets and the leaderboard rebuild are all

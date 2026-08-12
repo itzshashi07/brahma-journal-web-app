@@ -249,8 +249,17 @@ function GameView({ game, onBack }: { game: Game; onBack: () => void }) {
 
       setResult({ score, beat });
 
-      // Two calls, and neither blocks the other: a failed training write must
-      // not lose the score, and a failed score must not lose the minutes.
+      /**
+       * Three calls, and none blocks the others: a failed training write must
+       * not lose the score, and a failed score must not lose the minutes.
+       *
+       * The third one is the one that was missing. `/games/training` banks the
+       * seconds into a single synthetic `_total` row, which is enough for "how
+       * long have I spent in here" and useless for anything else. The app also
+       * writes a `FocusSession` carrying **which** game the time went to, and
+       * that is what Insights breaks the time down by — so a member who played
+       * only in the browser had a Game Zone total with nothing underneath it.
+       */
       await Promise.allSettled([
         api.post('/api/practice/games/scores', {
           gameId: game.id,
@@ -258,6 +267,11 @@ function GameView({ game, onBack }: { game: Game; onBack: () => void }) {
           lowerIsBetter: game.lowerIsBetter,
         }),
         api.post('/api/practice/games/training', { seconds }),
+        api.post('/api/practice/focus', {
+          durationSeconds: seconds,
+          game: game.id,
+          completed: true,
+        }),
       ]);
 
       void board.reload();

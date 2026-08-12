@@ -29,6 +29,24 @@ const nextConfig = {
    * site can be framed invisibly over an attacker's own buttons, and the person
    * clicking thinks they are dismissing a cookie banner while actually deleting
    * their account.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * `microphone=(self)`, and why it was the bug
+   *
+   * This header said `microphone=()`, which is not "ask before using the
+   * microphone" — it is "this document may never use the microphone, including
+   * its own origin". Chrome enforces it before any permission prompt is drawn,
+   * so `SpeechRecognition.start()` returned without error, fired `onend`
+   * immediately, and produced no transcript and no dialog. Every dictate button
+   * on the site was dead, and dead in the way that looks like a bug in the
+   * button: it lit up, it pulsed, it stopped, nothing arrived.
+   *
+   * `(self)` restores it for this origin only. It is still denied to every
+   * embed, which is the part actually worth having — a third-party frame on
+   * this site has no business with a microphone. The browser still asks the
+   * member for permission the first time, and the member can still refuse.
+   *
+   * `camera=()` stays closed. Nothing here takes photographs.
    */
   async headers() {
     return [
@@ -40,7 +58,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+            value: 'camera=(), microphone=(self), geolocation=(), interest-cohort=()',
           },
         ],
       },

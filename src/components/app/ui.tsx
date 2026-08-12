@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertCircle, Loader2, RefreshCw, X } from 'lucide-react';
 
 import { ApiError } from '@/lib/api';
+import type { Option } from '@/content/journal';
 
 /**
  * The small shared pieces of the signed-in app.
@@ -208,6 +209,240 @@ export function PrimaryLink({
     <Link href={href} className="btn-primary !py-2.5 text-[13px]">
       {children}
     </Link>
+  );
+}
+
+/**
+ * A dialog that behaves like the app's bottom sheets.
+ *
+ * Everything the signed-in app interrupts somebody with goes through here — the
+ * welcome, the check-in, the random prompt, the report form — so that they all
+ * dismiss the same way and none of them can be dismissed by accident. The
+ * backdrop closes only when `dismissible`, which the check-in turns off partway
+ * through: losing four answered questions to a stray tap outside the card is the
+ * kind of thing somebody does not come back from.
+ *
+ * The page behind it is frozen while it is open, for the reason spelled out on
+ * the drawer in AppShell: on a phone a thumb flick scrolls whatever is
+ * underneath, and `position: fixed` rather than `overflow: hidden` because iOS
+ * Safari ignores the latter on the scrolling element.
+ */
+export function Modal({
+  open,
+  onClose,
+  children,
+  label,
+  dismissible = true,
+  wide = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  label: string;
+  dismissible?: boolean;
+  wide?: boolean;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+
+  /**
+   * `onClose` through a ref.
+   *
+   * Callers pass an inline arrow, so the prop is a new function on every render.
+   * Listing it in the dependency array would tear the scroll lock down and set it
+   * up again on each one — restoring the body, scrolling to a captured offset,
+   * then re-freezing — which reads as the dialog juddering while you type in it.
+   */
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  useEffect(() => {
+    if (!open) return;
+
+    const y = window.scrollY;
+    const { style } = document.body;
+    const previous = {
+      position: style.position,
+      top: style.top,
+      width: style.width,
+      overflow: style.overflow,
+    };
+
+    style.position = 'fixed';
+    style.top = `-${y}px`;
+    style.width = '100%';
+    style.overflow = 'hidden';
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && dismissible) close.current();
+    };
+    window.addEventListener('keydown', onKey);
+
+    // Focus moves into the card so a keyboard lands inside the dialog rather
+    // than on whatever was behind it.
+    panel.current?.focus();
+
+    return () => {
+      style.position = previous.position;
+      style.top = previous.top;
+      style.width = previous.width;
+      style.overflow = previous.overflow;
+      window.scrollTo(0, y);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, dismissible]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label={dismissible ? 'Close' : 'Dialog backdrop'}
+        onClick={dismissible ? onClose : undefined}
+        tabIndex={dismissible ? 0 : -1}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+      />
+
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        tabIndex={-1}
+        className={`relative m-3 max-h-[88vh] w-full overflow-y-auto overscroll-contain rounded-lg border border-hairline bg-bg-card p-5 shadow-soft outline-none sm:m-6 ${
+          wide ? 'sm:max-w-2xl' : 'sm:max-w-md'
+        }`}
+      >
+        {dismissible && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-3 rounded-md p-1.5 text-ink-muted transition hover:bg-bg-dark/50 hover:text-ink-primary"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The tap-to-answer row.
+ *
+ * The journal's whole premise is that most days nobody wants to compose a
+ * paragraph — they want to record what happened in twenty seconds. A chip is
+ * that, and it is why the same control appears on the journal, the check-in and
+ * the random prompt rather than each screen growing its own.
+ *
+ * `single` clears the rest on selection, and re-tapping the chosen one clears
+ * it: there is no way to answer "how is your energy" and then take it back if
+ * the only way out is picking a different answer.
+ */
+export function ChipGroup({
+  options,
+  selected,
+  onChange,
+  single = false,
+  ariaLabel,
+}: {
+  options: Option[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  single?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label={ariaLabel}>
+      {options.map((option) => {
+        const on = selected.includes(option.id);
+        return (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => {
+              if (single) {
+                onChange(on ? [] : [option.id]);
+                return;
+              }
+              onChange(
+                on
+                  ? selected.filter((id) => id !== option.id)
+                  : [...selected, option.id]
+              );
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-pill border px-3 py-2 text-[12.5px] transition ${
+              on
+                ? 'border-primary bg-primary/20 font-semibold text-primary-light'
+                : 'border-hairline bg-bg-card/50 text-ink-secondary hover:border-primary/50 hover:text-ink-primary'
+            }`}
+          >
+            <span aria-hidden="true">{option.emoji}</span>
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The same control for answers that are plain strings, as the check-in's are. */
+export function TextChipGroup({
+  options,
+  selected,
+  onChange,
+  single = false,
+  ariaLabel,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  single?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <ChipGroup
+      options={options.map((label) => ({ id: label, label, emoji: '' }))}
+      selected={selected}
+      onChange={onChange}
+      single={single}
+      ariaLabel={ariaLabel}
+    />
+  );
+}
+
+/** A small labelled number. Used across the dashboard, insights and profile. */
+export function StatTile({
+  icon,
+  label,
+  value,
+  hint,
+  tone = 'default',
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: 'default' | 'accent';
+}) {
+  return (
+    <Card className="!p-4">
+      <div className="mb-2 flex items-center gap-2 text-ink-muted">
+        {icon && <span className={tone === 'accent' ? 'text-accent' : ''}>{icon}</span>}
+        <span className="text-[10.5px] uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="text-xl font-semibold text-ink-primary sm:text-2xl">
+        {value}
+        {hint && (
+          <span className="ml-1.5 text-[11.5px] font-normal text-ink-muted">
+            {hint}
+          </span>
+        )}
+      </p>
+    </Card>
   );
 }
 

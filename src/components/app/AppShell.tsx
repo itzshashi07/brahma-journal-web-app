@@ -27,6 +27,7 @@ import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/lib/auth-context';
 import { Avatar } from './Avatar';
+import { DailyPrompts } from './DailyPrompts';
 import { NotificationBell } from './NotificationBell';
 
 /**
@@ -259,6 +260,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         onClose={() => setOpen(false)}
         onSignOut={signOutAndLeave}
       />
+
+      {/* The welcome, the daily check-in and the random prompt — sequenced, and
+          only on the dashboard. See DailyPrompts. */}
+      <DailyPrompts />
     </div>
   );
 }

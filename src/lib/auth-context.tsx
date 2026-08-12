@@ -46,6 +46,14 @@ export type Profile = {
   gender?: string | null;
   phone?: string | null;
   avatarId?: string | null;
+  /**
+   * The member's craft, as an id from `content/professions.ts`.
+   *
+   * Free text on this website until now, which meant somebody who typed
+   * "singer" here got none of the singer checklist — the app matches on the id,
+   * and "singer" typed by hand is not `singer` chosen from the list often enough
+   * to rely on. The profile screen now writes an id.
+   */
   profession?: string | null;
   aim?: string | null;
   streak?: number;
@@ -53,6 +61,8 @@ export type Profile = {
   totalJournalEntries?: number;
   totalMeditationSeconds?: number;
   craftWeeklyTarget?: number;
+  /** The member's own checklist items, on top of their craft's presets. */
+  customHabits?: { id: string; label: string }[];
   recoveredDays?: string[];
   joinedAt?: string;
   createdAt?: string;
@@ -73,7 +83,33 @@ type AuthState = {
   resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+
+  /**
+   * True exactly once, for the render that follows a sign-in.
+   *
+   * The greeting marks an *event* — somebody arriving — and not a day, so it is
+   * consumed rather than stored against a date. Reaching the dashboard any other
+   * way (returning from the journal, a reload on a live session) leaves it
+   * silent, which is the difference between a greeting and a nag.
+   *
+   * `sessionStorage` rather than component state, because the sign-in happens on
+   * `/login` and the greeting is shown on `/app/dashboard` — a full navigation
+   * in between, which throws away anything held in React. Session-scoped so a
+   * new tab on the same account does not greet again.
+   */
+  consumeJustSignedIn: () => 'new' | 'returning' | null;
 };
+
+const SIGNED_IN_KEY = 'innenflow_just_signed_in';
+
+function markSignedIn(kind: 'new' | 'returning') {
+  try {
+    window.sessionStorage.setItem(SIGNED_IN_KEY, kind);
+  } catch {
+    // Private mode with storage disabled. The member simply is not greeted,
+    // which is a far better failure than a sign-in that throws.
+  }
+}
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -183,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       signIn: async (email, password) => {
         await signInWithEmailAndPassword(requireAuth(), email.trim(), password);
+        markSignedIn('returning');
       },
 
       signUp: async (name, email, password) => {
@@ -191,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email.trim(),
           password
         );
+        markSignedIn('new');
         const trimmed = name.trim();
         if (trimmed) {
           await fbUpdateProfile(credential.user, { displayName: trimmed });
@@ -207,7 +245,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // the browser happens to hold is how somebody signs in as the wrong
         // person on a shared laptop and writes into a stranger's journal.
         provider.setCustomParameters({ prompt: 'select_account' });
-        await signInWithPopup(requireAuth(), provider);
+        const credential = await signInWithPopup(requireAuth(), provider);
+
+        /**
+         * "New" means the account was created in the last few minutes — i.e.
+         * this sign-in is the one that created it. Google gives no separate
+         * signal for a first sign-in, and the profile document has often not come
+         * back yet at this point, so the auth metadata is the only thing that is
+         * reliably there the instant the credential is.
+         */
+        const created = credential.user.metadata?.creationTime;
+        const isNew =
+          Boolean(created) && Date.now() - new Date(created!).getTime() < 600_000;
+        markSignedIn(isNew ? 'new' : 'returning');
       },
 
       resetPassword: async (email) => {
@@ -219,9 +269,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (auth) await fbSignOut(auth);
         setProfile(null);
         setIsAdmin(false);
+        // Otherwise signing out and back in as somebody else greets the second
+        // person with the first one's pending flag.
+        try {
+          window.sessionStorage.removeItem(SIGNED_IN_KEY);
+        } catch {
+          // Nothing to clean up if storage was never writable.
+        }
       },
 
       refreshProfile: loadProfile,
+
+      consumeJustSignedIn: () => {
+        try {
+          const value = window.sessionStorage.getItem(SIGNED_IN_KEY);
+          if (!value) return null;
+          window.sessionStorage.removeItem(SIGNED_IN_KEY);
+          return value === 'new' ? 'new' : 'returning';
+        } catch {
+          return null;
+        }
+      },
     }),
     [loading, user, profile, isAdmin, loadProfile]
   );

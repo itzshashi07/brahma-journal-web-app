@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Flag, MessageCircle, Send, ShieldOff, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { EyeOff, Flag, MessageCircle, Send, ShieldOff, Trash2 } from 'lucide-react';
 
 import {
   AsyncSection,
@@ -11,6 +11,12 @@ import {
   timeAgo,
   useApi,
 } from '@/components/app/ui';
+import {
+  ReportDialog,
+  hiddenThoughtIds,
+  hideThought,
+  type ReportTarget,
+} from '@/components/app/ReportDialog';
 import { api, type Paged } from '@/lib/api';
 
 /**
@@ -84,6 +90,24 @@ const pick = <T,>(list: T[]): T =>
 export default function ThoughtsPage() {
   const [composing, setComposing] = useState(false);
 
+  /**
+   * What to report, and what this member has chosen not to see again.
+   *
+   * The dialog is owned by the page rather than by each card so that only one
+   * can ever be open, and the hidden set is read once after mount — reading
+   * `localStorage` during the render would differ between the server pass and
+   * the client one and hydration would tear.
+   */
+  const [reporting, setReporting] = useState<ReportTarget | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+
+  useEffect(() => setHidden(hiddenThoughtIds()), []);
+
+  const hide = useCallback((id: string) => {
+    hideThought(id);
+    setHidden((current) => new Set(current).add(id));
+  }, []);
+
   const state = useApi(
     () =>
       api.get<Paged<Thought, 'thoughts'>>('/api/community/thoughts', {
@@ -132,33 +156,55 @@ export default function ThoughtsPage() {
       )}
 
       <AsyncSection state={state}>
-        {(data) =>
-          data.thoughts.length === 0 ? (
-            <EmptyState
-              title="The board is quiet"
-              body="Be the first. Whatever it is, somebody here has been close to it — and nothing you post is attached to your account."
-              action={
-                <button
-                  type="button"
-                  onClick={() => setComposing(true)}
-                  className="btn-primary"
-                >
-                  Post anonymously
-                </button>
-              }
-            />
-          ) : (
+        {(data) => {
+          // Hidden posts are filtered here rather than at the request, because
+          // the list is local and the server has deliberately never been told
+          // which ones they are.
+          const visible = data.thoughts.filter(
+            (thought) => !hidden.has(thought._id)
+          );
+
+          if (data.thoughts.length === 0) {
+            return (
+              <EmptyState
+                title="The board is quiet"
+                body="Be the first. Whatever it is, somebody here has been close to it — and nothing you post is attached to your account."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setComposing(true)}
+                    className="btn-primary"
+                  >
+                    Post anonymously
+                  </button>
+                }
+              />
+            );
+          }
+
+          if (visible.length === 0) {
+            return (
+              <EmptyState
+                title="Nothing left on this page"
+                body="You have hidden everything currently on the board. New reflections will still appear."
+              />
+            );
+          }
+
+          return (
             <div className="space-y-3">
-              {data.thoughts.map((thought) => (
+              {visible.map((thought) => (
                 <ThoughtCard
                   key={thought._id}
                   thought={thought}
                   onReplied={state.reload}
+                  onReport={setReporting}
+                  onHide={hide}
                 />
               ))}
             </div>
-          )
-        }
+          );
+        }}
       </AsyncSection>
 
       <p className="mt-8 text-center text-[11.5px] leading-relaxed text-ink-muted">
@@ -166,6 +212,17 @@ export default function ThoughtsPage() {
         board should not become a permanent record of what people were
         struggling with a year ago.
       </p>
+
+      <ReportDialog
+        target={reporting}
+        onClose={() => setReporting(null)}
+        // Reporting something and then continuing to see it is the one outcome
+        // nobody wants, so a report hides it too. The moderator still has the
+        // excerpt, so hiding it locally costs the queue nothing.
+        onReported={() => {
+          if (reporting) hide(reporting.contentId);
+        }}
+      />
     </>
   );
 }
@@ -173,9 +230,13 @@ export default function ThoughtsPage() {
 function ThoughtCard({
   thought,
   onReplied,
+  onReport,
+  onHide,
 }: {
   thought: Thought;
   onReplied: () => void;
+  onReport: (target: ReportTarget) => void;
+  onHide: (id: string) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -229,20 +290,6 @@ function ThoughtCard({
     }
   }
 
-  async function report() {
-    try {
-      await api.post('/api/support/reports', {
-        contentKind: 'thought',
-        contentId: thought._id,
-        reason: 'Reported from the board',
-        excerpt: thought.content.slice(0, 200),
-      });
-      alert('Reported. A person will look at it.');
-    } catch {
-      alert('Could not send that report. Try again in a moment.');
-    }
-  }
-
   return (
     <Card>
       <div className="mb-2 flex items-center gap-2">
@@ -258,8 +305,12 @@ function ThoughtCard({
           · {timeAgo(thought.createdAt)}
         </span>
 
+        {/* Reporting and hiding are not offered on your own reflection — the
+            same rule the app applies. Flagging yourself to a moderator is not a
+            thing anybody means to do, and the delete button is the control that
+            actually answers "I regret this". */}
         <div className="ml-auto flex items-center gap-3">
-          {thought.mine && (
+          {thought.mine ? (
             <button
               type="button"
               onClick={remove}
@@ -270,17 +321,37 @@ function ThoughtCard({
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
-          )}
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => onHide(thought._id)}
+                className="text-ink-muted transition hover:text-ink-primary"
+                title="Hide this from my board"
+                aria-label="Hide this reflection"
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+              </button>
 
-          <button
-            type="button"
-            onClick={report}
-            className="text-ink-muted transition hover:text-accent"
-            title="Report this"
-            aria-label="Report this reflection"
-          >
-            <Flag className="h-3.5 w-3.5" />
-          </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onReport({
+                    contentKind: 'thought',
+                    contentId: thought._id,
+                    // No `reportedUid`: the board carries no author, and that is
+                    // a promise this screen keeps rather than a gap to close.
+                    excerpt: thought.content,
+                  })
+                }
+                className="text-ink-muted transition hover:text-accent"
+                title="Report this"
+                aria-label="Report this reflection"
+              >
+                <Flag className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -302,13 +373,13 @@ function ThoughtCard({
       {open && (
         <div className="mt-4 space-y-3 border-t border-hairline pt-4">
           {thought.replies.map((item) => (
-            <div key={item.id} className="flex gap-2.5">
+            <div key={item.id} className="group flex gap-2.5">
               <span
                 className="mt-0.5 h-5 w-5 shrink-0 rounded-full"
                 style={{ backgroundColor: item.anonymousColor }}
                 aria-hidden="true"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold text-ink-secondary">
                   {item.anonymousName}
                   <span className="ml-1.5 font-normal text-ink-muted">
@@ -319,6 +390,27 @@ function ThoughtCard({
                   {item.content}
                 </p>
               </div>
+
+              {/* A reply is the half of this board that a moderator could not
+                  previously be told about at all — the flag only ever existed on
+                  the parent post. `parentId` goes with it so the queue opens the
+                  conversation rather than a fragment of it. */}
+              <button
+                type="button"
+                onClick={() =>
+                  onReport({
+                    contentKind: 'reply',
+                    contentId: item.id,
+                    parentId: thought._id,
+                    excerpt: item.content,
+                  })
+                }
+                className="h-fit shrink-0 text-ink-muted opacity-60 transition hover:text-accent hover:opacity-100"
+                title="Report this reply"
+                aria-label="Report this reply"
+              >
+                <Flag className="h-3 w-3" />
+              </button>
             </div>
           ))}
 
