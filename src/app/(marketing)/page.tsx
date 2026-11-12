@@ -1,4 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
+import { VibePicker } from "@/components/VibePicker";
+import { MemeSection } from "@/components/MemeSection";
 import {
   ArrowDown,
   ArrowRight,
@@ -8,7 +11,6 @@ import {
   ChartNoAxesCombined,
 } from "lucide-react";
 import { DownloadButton } from "@/components/DownloadButton";
-import { PhonePreview } from "@/components/PhonePreview";
 import {
   DownloadSection,
   FeatureGrid,
@@ -38,19 +40,24 @@ export default function HomePage() {
         <div className="promo-container hero-layout">
           <div className="hero-copy">
             <span className="eyebrow">
-              <span className="status-dot" /> YOUR PRIVATE JOURNAL. YOUR DAILY
-              PAUSE.
+              <span className="status-dot" /> FOR THE BRAIN WITH TOO MANY TABS
+              OPEN
             </span>
             <h1>
-              A little less
+              37 tabs open.
               <br />
-              in your head.
-              <br />
-              <em>A little more you.</em>
+              <em>
+                You deserve
+                <br />a pause.
+              </em>
             </h1>
             <p className="hero-description">
-              A private journal, a breathing break, and a way to notice your
-              patterns. A small space for yourself at the end of a busy day.
+              Overthinking the text. The deadline. The entire plot. Put it into
+              a private journal, take a breathing break, and make a little space
+              for you.
+            </p>
+            <p className="hero-hinglish">
+              Sab sorted nahi hai? Start with one honest thought.
             </p>
             <div className="hero-actions">
               <DownloadButton />
@@ -70,28 +77,26 @@ export default function HomePage() {
               </span>
             </div>
           </div>
-          <div className="hero-visual">
-            <div className="hero-orbit" aria-hidden="true" />
-            <span className="hero-visual-label">A QUIETER PLACE TO THINK</span>
-            <PhonePreview
-              className="hero-phone"
-              src="/images/app/2-reset.png"
-              alt="Preview of the next InnenFlow Android update: a mood check-in and choice of topic"
+          <div className="hero-visual genz-visual">
+            <div className="brain-halo" aria-hidden="true" />
+            <span className="hero-visual-label">
+              CURRENT STATUS: ONE THING AT A TIME
+            </span>
+            <Image
+              className="hero-brain"
+              src="/images/brain-with-too-many-tabs.webp"
+              alt="Original illustration of a purple brain in a hoodie, putting thoughts in a notebook while browser tabs float around it"
+              width={1312}
+              height={1199}
+              sizes="(max-width: 640px) 100vw, 50vw"
               priority
             />
-            <div className="floating-note">
-              <span>FOR THE DAYS THAT FEEL FULL</span>
-              <p>
-                One thing
-                <br />
-                <em>at a time.</em>
-              </p>
-              <div className="note-line" />
-            </div>
+            <span className="brain-sticker sticker-top">overthinking.exe</span>
+            <span className="brain-sticker sticker-bottom">
+              less scroll. more soul. ✳
+            </span>
             <span className="hero-preview-label">
-              {site.resetReleased
-                ? "Inside the latest Android update"
-                : "App screen · Next update preview"}
+              A little space for your actual life.
             </span>
           </div>
         </div>
@@ -126,8 +131,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      <HowItWorks />
-      <InsideTheApp />
+      <VibePicker />
+      <MemeSection />
       <section className="section-space">
         <div className="promo-container">
           <div className="section-heading-row">
@@ -144,6 +149,8 @@ export default function HomePage() {
           <FeatureGrid />
         </div>
       </section>
+      <InsideTheApp />
+      <HowItWorks />
       <QuietMoment />
       <PrivacyStrip />
       <Questions />

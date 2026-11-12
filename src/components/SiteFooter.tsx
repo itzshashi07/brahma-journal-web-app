@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { site } from "@/lib/site";
-import { ArrowUpRight } from "lucide-react";
 export function SiteFooter() {
   return (
     <footer className="site-footer">
@@ -23,6 +21,8 @@ export function SiteFooter() {
           <div className="footer-links">
             <span>Explore</span>
             <Link href="/features">App features</Link>
+            <Link href="/moments">Your kind of day</Link>
+            <Link href="/inside">App screen previews</Link>
             <Link href="/download">Download for Android</Link>
             <Link href="/about">Our story</Link>
             <Link href="/support">Help & support</Link>
@@ -32,9 +32,7 @@ export function SiteFooter() {
             <Link href="/privacy">Privacy policy</Link>
             <Link href="/terms">Terms of service</Link>
             <Link href="/delete-account">Account deletion</Link>
-            <a href={site.instagram} target="_blank" rel="noopener noreferrer">
-              Instagram <ArrowUpRight size={13} />
-            </a>
+            <Link href="/#questions">Common questions</Link>
           </div>
         </div>
         <div className="footer-bottom">

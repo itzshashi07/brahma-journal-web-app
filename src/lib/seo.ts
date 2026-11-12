@@ -60,7 +60,6 @@ export function organizationSchema() {
     name: site.name,
     url: site.url,
     email: site.contactEmail,
-    sameAs: [site.instagram],
   };
 }
 export function websiteSchema() {

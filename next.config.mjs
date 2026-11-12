@@ -57,18 +57,23 @@ const nextConfig = {
         destination: "/download",
         permanent: true,
       })),
-      ...[
-        "features",
-        "use-cases",
-        "guides",
-        "wisdom",
-        "compare",
-        "sanctuary",
-      ].map((path) => ({
-        source: `/${path}/:slug+`,
-        destination: "/features",
+      ...Object.entries({
+        affirmations: "/features",
+        community: "/features",
+        sanctuary: "/features/library",
+        counselling: "/support",
+      }).map(([old, destination]) => ({
+        source: `/features/${old}`,
+        destination,
         permanent: true,
       })),
+      ...["use-cases", "guides", "wisdom", "compare", "sanctuary"].map(
+        (path) => ({
+          source: `/${path}/:slug+`,
+          destination: "/features",
+          permanent: true,
+        }),
+      ),
       ...["use-cases", "guides", "wisdom", "compare", "sanctuary"].map(
         (path) => ({
           source: `/${path}`,

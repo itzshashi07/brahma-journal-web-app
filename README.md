@@ -20,8 +20,18 @@ false until Android 1.8.0 is live; screenshots of that build are then labelled a
 an upcoming preview rather than features already available in the store.
 
 App screenshots are captured from the Android app with illustrative entries.
-The lifestyle image is AI-generated. All assets and the font are served locally.
+The lifestyle image and purple brain illustrations are AI-generated. The brain
+is promotional artwork, not an app feature. Images are optimised as WebP. The
+locally hosted GIF is opt-in, has play/pause controls and a reduced-motion poster.
+All assets and the font are served locally.
 Publication uses the existing GitHub → Vercel deployment pipeline.
+
+The homepage includes a local-state moment picker, original meme cards and
+user-triggered native sharing (or a copy-link fallback). It sends no check-in
+data and starts no account session. Seven `/features/[slug]` pages and four
+`/moments/[slug]` pages are generated at build time. `/inside` clearly labels
+the upcoming Android release previews. Known legacy content URLs redirect;
+unknown pages return a real 404.
 
 For production HTTP smoke checks, run `npm start -- --port 3033`, then
 `npm run verify:promo` in a separate terminal. Set `PROMO_BASE_URL` to run the

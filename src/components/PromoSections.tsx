@@ -61,7 +61,9 @@ export function FeatureGrid({ full = false }: { full?: boolean }) {
             <FeatureIcon name={feature.icon} />
             <span>0{i + 1}</span>
           </div>
-          <h3>{feature.name}</h3>
+          <h3>
+            <Link href={`/features/${feature.id}`}>{feature.name}</Link>
+          </h3>
           <p>{feature.description}</p>
           {full && (
             <ul className="feature-points">
@@ -73,6 +75,12 @@ export function FeatureGrid({ full = false }: { full?: boolean }) {
               ))}
             </ul>
           )}
+          <Link
+            href={`/features/${feature.id}`}
+            className="text-link feature-explore"
+          >
+            Explore this feature <ArrowRight size={16} />
+          </Link>
         </article>
       ))}
     </div>
@@ -239,13 +247,13 @@ export function DownloadSection() {
         <div>
           <span className="eyebrow">A SMALL PLACE TO START</span>
           <h2>
-            Your day is full.
+            Your brain does a lot.
             <br />
-            <em>Make a little room for you.</em>
+            <em>Give it a little room.</em>
           </h2>
           <p>
-            Take your journal, your breathing break and your own small practice
-            with you.
+            One honest sentence. A breathing break. A small win worth keeping.
+            Start wherever you are with InnenFlow for Android.
           </p>
           <DownloadButton />
           <span className="download-footnote">

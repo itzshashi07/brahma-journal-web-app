@@ -21,7 +21,6 @@ export const site = {
   locale: "en_IN",
   playUrl: "https://play.google.com/store/apps/details?id=com.brahma.brahmaApp",
   packageId: "com.brahma.brahmaApp",
-  instagram: "https://www.instagram.com/____shashii_o7/",
   // Set only after the 1.8.0 Android release is actually live on Google Play.
   resetReleased: process.env.NEXT_PUBLIC_ANDROID_RESET_RELEASED === "true",
 } as const;

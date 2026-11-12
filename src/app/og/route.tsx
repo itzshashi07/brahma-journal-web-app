@@ -27,8 +27,8 @@ export async function GET() {
             lineHeight: 1.08,
           }}
         >
-          <span>A little less in your head.</span>
-          <span style={{ color: "#6c4ab0" }}>A little more you.</span>
+          <span>37 tabs open.</span>
+          <span style={{ color: "#6c4ab0" }}>You deserve a pause.</span>
         </div>
         <div style={{ display: "flex", fontSize: 25 }}>
           Private journal. Daily pause. Available on Google Play.

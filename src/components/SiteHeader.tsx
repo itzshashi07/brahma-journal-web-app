@@ -1,20 +1,32 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Logo } from "./Logo";
 import { DownloadButton } from "./DownloadButton";
 const links = [
   { href: "/features", label: "The app" },
-  { href: "/#how-it-works", label: "How it fits your day" },
-  { href: "/#inside", label: "A look inside" },
-  { href: "/#questions", label: "Questions" },
+  { href: "/moments", label: "Your kind of day" },
+  { href: "/inside", label: "A look inside" },
+  { href: "/#relatable", label: "Too relatable" },
 ];
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        toggle.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [open]);
   return (
     <header className="site-header">
       <div className="promo-container header-inner">
@@ -34,6 +46,7 @@ export function SiteHeader() {
         <div className="header-actions">
           <DownloadButton compact label="Download app" />
           <button
+            ref={toggle}
             type="button"
             className="menu-toggle"
             aria-expanded={open}
