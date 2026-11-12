@@ -1,36 +1,28 @@
-# InnenFlow Web
+# InnenFlow promotional website
 
-The website for [InnenFlow](https://play.google.com/store/apps/details?id=com.brahma.brahmaApp)
-— a private journal, meditation timer and anonymous support community.
+The public website for the InnenFlow Android app. Its job is to explain the
+product, show app previews and link to the official Google Play download.
 
-Two halves in one Next.js app:
-
-- **The public site** — statically generated, indexed, and built to be found.
-  Nine feature pages, seven use-case pages, a member-written article library,
-  and the install page.
-- **The application** — everything behind sign-in, at feature parity with the
-  Android app, against the same API and the same account. Nothing to sync.
+There is no web application, authentication, Firebase SDK, user dashboard,
+journal editor or app API client. Old `/app/*`, `/login`, `/signup` and other
+retired routes permanently redirect to `/download`.
 
 ```bash
-cp .env.example .env.local     # fill in the Firebase web config
 npm install
 npm run dev
+npm run typecheck
+npm run build
 ```
 
-The marketing pages render with no configuration at all; only sign-in needs the
-Firebase values.
+The website works without environment variables or a backend. Optional settings
+are documented in `.env.example`. `NEXT_PUBLIC_ANDROID_RESET_RELEASED` must stay
+false until Android 1.8.0 is live; screenshots of that build are then labelled as
+an upcoming preview rather than features already available in the store.
 
-**Read [`IMPLEMENTATION.md`](./IMPLEMENTATION.md)** for the architecture, why
-things are shaped the way they are, and what must be kept in step with the other
-two repos.
+App screenshots are captured from the Android app with illustrative entries.
+The lifestyle image is AI-generated. All assets and the font are served locally.
+Publication uses the existing GitHub → Vercel deployment pipeline.
 
----
-
-| | |
-|---|---|
-| Framework | Next.js 16 (App Router) |
-| Styling | Tailwind, with the Flutter app's exact design tokens |
-| Identity | Firebase Auth — identity only, no Firestore |
-| Data | The InnenFlow API → MongoDB |
-| Android app | [Brahma-Journal-app](https://github.com/itzshashi07/Brahma-Journal-app) |
-| Backend | [innenflow-backend](https://github.com/itzshashi07/innenflow-backend) |
+For production HTTP smoke checks, run `npm start -- --port 3033`, then
+`npm run verify:promo` in a separate terminal. Set `PROMO_BASE_URL` to run the
+same checks against the deployed website.

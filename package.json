@@ -1,19 +1,18 @@
 {
   "name": "innenflow-web",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "InnenFlow on the web. A public, SEO-first marketing site and the full application behind sign-in — the same features as the Android app, against the same API.",
+  "description": "The public promotional and Android download website for InnenFlow. No browser app or authentication.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "verify:promo": "node scripts/verify-promo.mjs"
   },
   "dependencies": {
-    "firebase": "^11.1.0",
     "lucide-react": "^0.468.0",
-    "next": "^16.3.0",
+    "next": "^16.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -25,5 +24,8 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   }
 }

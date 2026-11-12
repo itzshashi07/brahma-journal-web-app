@@ -26,7 +26,7 @@
  * a second asset, and it costs no request on a header that appears on every
  * route.
  */
-export function Logo({ className = 'h-8 w-8' }: { className?: string }) {
+export function Logo({ className = "h-8 w-8" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 48 48"
