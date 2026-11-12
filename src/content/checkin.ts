@@ -316,6 +316,9 @@ export function questionsForToday(now = new Date()): CheckInQuestion[] {
  * journal look abandoned.
  */
 const CHECKIN_LABELS: Record<string, string> = {
+  reset_topic: 'What was on my mind',
+  reset_thought: 'My reset reflection',
+  reset_next_step: 'My next small step',
   day: 'How the day was',
   body: 'How the body was',
   family: 'How everyone at home was',
